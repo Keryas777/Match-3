@@ -6,7 +6,7 @@
     el.textContent =
       "Le jeu a crash.\n\n" +
       String(err?.stack || err) +
-      "\n\nAstuce: vérifie que index.html / style.css / game.js sont bien au même endroit (Pages).";
+      "\n\nAstuce: vérifie que index.html / style.css / game.js sont bien au même endroit.";
   };
 
   try {
@@ -38,7 +38,6 @@
       objectives: document.getElementById("objectives"),
       status: document.getElementById("status"),
       newGame: document.getElementById("newGame"),
-
       openLevels: document.getElementById("openLevels"),
 
       winModal: document.getElementById("winModal"),
@@ -88,16 +87,19 @@
       fxFlashMs: 160,
       shakeMs: 220,
 
-      beamMs: 320,     // un peu plus long pour le sweep
+      beamMs: 320,
       crossMs: 420,
     };
 
-    const SAVE_KEY = "match3_v2_save";
+    const SAVE_KEY = "match3_v3_save";
 
+    // Ajoute autant de niveaux que tu veux
     const LEVELS = [
       { moves: 20, targetScore: 800,  collect: { 0: 12, 3: 10 }, ice: 8  },
       { moves: 22, targetScore: 1200, collect: { 2: 14, 5: 12 }, ice: 12 },
       { moves: 25, targetScore: 1800, collect: { 1: 18, 4: 14 }, ice: 16 },
+      { moves: 26, targetScore: 2300, collect: { 0: 18, 2: 14 }, ice: 18 },
+      { moves: 28, targetScore: 3000, collect: { 3: 20 },      ice: 22 },
     ];
 
     // ---------- UTILS ----------
@@ -130,6 +132,9 @@
     let targetScore = 0;
     let objectives = { collect: {}, iceLeft: 0 };
 
+    // NEW: progression (niveau max débloqué, en 1-based)
+    let unlockedMax = 1;
+
     let pieces = [];
     let ice = [];
 
@@ -151,12 +156,8 @@
       const { x, y } = xyFromCell(r, c);
       fx.bursts.push({ x, y, color: COLORS[type], intensity, t0: now(), dur: CFG.fxBurstMs });
     }
-    function addFlash(intensity = 1) {
-      fx.flash = { t0: now(), dur: CFG.fxFlashMs, intensity };
-    }
-    function addShake(intensity = 1) {
-      fx.shake = { t0: now(), dur: CFG.shakeMs, intensity };
-    }
+    function addFlash(intensity = 1) { fx.flash = { t0: now(), dur: CFG.fxFlashMs, intensity }; }
+    function addShake(intensity = 1) { fx.shake = { t0: now(), dur: CFG.shakeMs, intensity }; }
 
     function addBeamRow(r, intensity = 1, mode = "full", centerC = null) {
       const cy = PADDING + r * CELL + CELL / 2;
@@ -217,7 +218,7 @@
         ctx.globalAlpha = 1;
       }
 
-      // beams (full or sweep)
+      // beams
       fx.beams = fx.beams.filter((b) => t < b.t0 + b.dur);
       for (const b of fx.beams) {
         const p = clamp((t - b.t0) / b.dur, 0, 1);
@@ -226,7 +227,6 @@
 
         ctx.globalAlpha = a;
         ctx.fillStyle = "#ffffff";
-
         const thickness = 12;
 
         if (b.kind === "row") {
@@ -234,14 +234,11 @@
           if (b.mode === "full") {
             ctx.fillRect(PADDING, y - thickness/2, BOARD_SIZE, thickness);
           } else {
-            // sweep depuis cx vers gauche/droite
             const maxL = b.cx - PADDING;
             const maxR = PADDING + BOARD_SIZE - b.cx;
             const left = b.cx - maxL * e;
             const width = (maxL + maxR) * e;
             ctx.fillRect(left, y - thickness/2, width, thickness);
-
-            // petit "noyau" lumineux
             ctx.globalAlpha = a * 0.9;
             ctx.fillRect(b.cx - 18, y - 3, 36, 6);
             ctx.globalAlpha = a;
@@ -256,13 +253,11 @@
             const top = b.cy - maxU * e;
             const height = (maxU + maxD) * e;
             ctx.fillRect(x - thickness/2, top, thickness, height);
-
             ctx.globalAlpha = a * 0.9;
             ctx.fillRect(x - 3, b.cy - 18, 6, 36);
             ctx.globalAlpha = a;
           }
         }
-
         ctx.globalAlpha = 1;
       }
 
@@ -282,7 +277,6 @@
         ctx.moveTo(c.x - r, c.y); ctx.lineTo(c.x + r, c.y);
         ctx.moveTo(c.x, c.y - r); ctx.lineTo(c.x, c.y + r);
         ctx.stroke();
-
         ctx.globalAlpha = 1;
       }
 
@@ -363,18 +357,81 @@
     }
     function hideLose() { ui.loseModal.classList.add("hidden"); }
 
+    // ---------- LEVEL MAP (Candy Crush style) ----------
     function openLevels() {
       ui.levelsGrid.innerHTML = "";
-      LEVELS.forEach((L, i) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.textContent = `Niv ${i + 1}`;
-        b.onclick = () => { closeLevels(); applyLevel(i, true); };
-        ui.levelsGrid.appendChild(b);
+      ui.levelsGrid.classList.add("mapWrap");
+
+      // positions en % (zigzag vertical)
+      const nodes = LEVELS.map((_, i) => {
+        const x = (i % 2 === 0) ? 25 : 75;
+        const y = 12 + i * 18;
+        return { i, x, y };
       });
+
+      // SVG path du chemin
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.classList.add("mapPath");
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      const d = nodes.map((n, idx) => `${idx === 0 ? "M" : "L"} ${n.x} ${n.y}`).join(" ");
+      path.setAttribute("d", d);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "rgba(255,255,255,0.30)");
+      path.setAttribute("stroke-width", "3");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(path);
+
+      // chemin "débloqué" en plus clair
+      const unlockedPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      const unlockedCount = clamp(unlockedMax, 1, LEVELS.length);
+      const d2 = nodes
+        .slice(0, unlockedCount)
+        .map((n, idx) => `${idx === 0 ? "M" : "L"} ${n.x} ${n.y}`)
+        .join(" ");
+      unlockedPath.setAttribute("d", d2);
+      unlockedPath.setAttribute("fill", "none");
+      unlockedPath.setAttribute("stroke", "rgba(255,255,255,0.65)");
+      unlockedPath.setAttribute("stroke-width", "4");
+      unlockedPath.setAttribute("stroke-linecap", "round");
+      unlockedPath.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(unlockedPath);
+
+      ui.levelsGrid.appendChild(svg);
+
+      // nodes
+      nodes.forEach(n => {
+        const levelNumber = n.i + 1;
+        const isUnlocked = levelNumber <= unlockedMax;
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "mapNode" + (isUnlocked ? "" : " locked");
+        btn.style.left = `${n.x}%`;
+        btn.style.top = `${n.y}%`;
+
+        if (n.i === levelIndex) btn.classList.add("current");
+
+        if (!isUnlocked) {
+          btn.disabled = true;
+          btn.innerHTML = `${levelNumber}<span class="lock">🔒</span>`;
+        } else {
+          btn.textContent = `${levelNumber}`;
+          btn.onclick = () => { closeLevels(); applyLevel(n.i, true); };
+        }
+
+        ui.levelsGrid.appendChild(btn);
+      });
+
       ui.levelsModal.classList.remove("hidden");
     }
-    function closeLevels() { ui.levelsModal.classList.add("hidden"); }
+
+    function closeLevels() {
+      ui.levelsGrid.classList.remove("mapWrap");
+      ui.levelsModal.classList.add("hidden");
+    }
 
     // ---------- BOARD ----------
     function resetArrays() {
@@ -386,12 +443,9 @@
       const { x, y } = xyFromCell(r, c);
       return {
         r, c, type, special,
-        x, y,
-        sx: x, sy: y,
-        tx: x, ty: y,
+        x, y, sx: x, sy: y, tx: x, ty: y,
         t0: 0, t1: 0,
-        popping: false,
-        popT0: 0, popT1: 0,
+        popping: false, popT0: 0, popT1: 0,
         active: true
       };
     }
@@ -403,18 +457,8 @@
       p.tx = x; p.ty = y;
     }
 
-    function startMoveAnim(p, ms) {
-      p.t0 = now();
-      p.t1 = p.t0 + ms;
-      p.sx = p.x;
-      p.sy = p.y;
-    }
-
-    function startPop(p) {
-      p.popping = true;
-      p.popT0 = now();
-      p.popT1 = p.popT0 + CFG.popMs;
-    }
+    function startMoveAnim(p, ms) { p.t0 = now(); p.t1 = p.t0 + ms; p.sx = p.x; p.sy = p.y; }
+    function startPop(p) { p.popping = true; p.popT0 = now(); p.popT1 = p.popT0 + CFG.popMs; }
 
     function wouldMakeMatchAt(r, c, type) {
       const get = (rr, cc) => (inBounds(rr, cc) ? pieces[rr][cc]?.type ?? null : null);
@@ -662,7 +706,7 @@
       return place;
     }
 
-    // ---------- CLEAR / RESOLVE HELPERS ----------
+    // ---------- CLEAR HELPERS ----------
     function buildCrossSet(r, c) {
       const s = new Set();
       for (let cc = 0; cc < GRID; cc++) s.add(keyOf(r, cc));
@@ -714,10 +758,10 @@
       }, CFG.popMs + CFG.chainGap);
     }
 
-    // ---------- COMBOS TYPO ----------
+    // ---------- COMBOS ----------
     function specialCombo(from, to) {
-      const a = pieces[to.r][to.c];     // moved into "to"
-      const b = pieces[from.r][from.c]; // moved into "from"
+      const a = pieces[to.r][to.c];
+      const b = pieces[from.r][from.c];
       if (!a || !b || !a.special || !b.special) return false;
 
       movesLeft--;
@@ -731,7 +775,6 @@
         input.locked = true;
 
         if (fxKind === "rowcol_sweep") {
-          // sweep laser depuis le point d’impact (to) + une croix sur les 2 cases
           addCross(from.r, from.c, 1.15);
           addCross(to.r, to.c, 1.35);
           addBeamRow(to.r, 1.25, "sweep", to.c);
@@ -778,17 +821,16 @@
         applyClearSet(clear, 140);
       };
 
-      // row+col => sweep laser + croix
+      // row+col => sweep
       if ((sa === "row" && sb === "col") || (sa === "col" && sb === "row")) {
         const clear = buildCrossSet(to.r, to.c);
-        // + on ajoute aussi les deux cases swap pour être sûr
         clear.add(keyOf(from.r, from.c));
         clear.add(keyOf(to.r, to.c));
         doClear(clear, "rowcol_sweep");
         return true;
       }
 
-      // row+row => 2 rangées
+      // row+row
       if (sa === "row" && sb === "row") {
         const clear = new Set();
         for (let cc = 0; cc < GRID; cc++) clear.add(keyOf(from.r, cc));
@@ -797,7 +839,7 @@
         return true;
       }
 
-      // col+col => 2 colonnes
+      // col+col
       if (sa === "col" && sb === "col") {
         const clear = new Set();
         for (let rr = 0; rr < GRID; rr++) clear.add(keyOf(rr, from.c));
@@ -828,18 +870,14 @@
         return true;
       }
 
-      // color + (row/col/bomb) => morph target color into that special then detonate them
+      // color + (row/col/bomb) => morph + detonate
       if (sa === "color" || sb === "color") {
-        const otherPiece = (sa === "color") ? b : a; // row/col/bomb
+        const otherPiece = (sa === "color") ? b : a;
         const morphTo = otherPiece.special;
-
         const targetType = otherPiece.type;
 
-        const clear = new Set();
-        clear.add(keyOf(from.r, from.c));
-        clear.add(keyOf(to.r, to.c));
+        const clear = new Set([keyOf(from.r, from.c), keyOf(to.r, to.c)]);
 
-        // morph
         for (let r = 0; r < GRID; r++) {
           for (let c = 0; c < GRID; c++) {
             const p = pieces[r][c];
@@ -847,7 +885,6 @@
           }
         }
 
-        // trigger all morphed specials
         for (let r = 0; r < GRID; r++) {
           for (let c = 0; c < GRID; c++) {
             const p = pieces[r][c];
@@ -858,15 +895,11 @@
           }
         }
 
-        if (morphTo === "row") addBeamRow(to.r, 1.15, "full");
-        if (morphTo === "col") addBeamCol(to.c, 1.15, "full");
-        if (morphTo === "bomb") addBurst(to.r, to.c, otherPiece.type, 2.2);
-
         doClear(clear, "colorMorph");
         return true;
       }
 
-      // fallback: cross
+      // fallback
       doClear(buildCrossSet(to.r, to.c), "rowcol_sweep");
       return true;
     }
@@ -886,6 +919,10 @@
           save();
 
           if (objectivesDone()) {
+            // NEW: débloque le niveau suivant
+            unlockedMax = Math.max(unlockedMax, Math.min(levelIndex + 2, LEVELS.length));
+            save();
+
             state = "WIN";
             updateHUD("Objectifs remplis ✅");
             showWin();
@@ -893,21 +930,20 @@
             state = "LOSE";
             updateHUD("Plus de coups… 😬");
             showLose();
-          } else updateHUD("");
-
+          } else {
+            updateHUD("");
+          }
           return;
         }
 
         const clear = new Set();
         const keep = new Set();
 
-        // create bonuses
         for (const g of groups) {
           const kept = createBonusFromGroup(g);
           if (kept) keep.add(keyOf(kept.r, kept.c));
         }
 
-        // base clear
         for (const g of groups) {
           for (const c of g.cells) {
             const k = keyOf(c.r, c.c);
@@ -915,7 +951,6 @@
           }
         }
 
-        // expand specials
         let expanded = true;
         while (expanded) {
           expanded = false;
@@ -926,17 +961,12 @@
             if (p && p.special) triggerSpecialAt(r, c, extra);
           }
           for (const k of extra) {
-            if (!clear.has(k) && !keep.has(k)) {
-              clear.add(k);
-              expanded = true;
-            }
+            if (!clear.has(k) && !keep.has(k)) { clear.add(k); expanded = true; }
           }
         }
 
-        // scoring (chain)
         score += clear.size * 10 + Math.max(0, groups.length - 1) * 20;
 
-        // collect counts
         const counts = new Map();
         for (const k of clear) {
           const [r, c] = k.split(",").map(Number);
@@ -945,7 +975,6 @@
         }
         for (const [t, cnt] of counts.entries()) applyCollect(String(t), cnt);
 
-        // break ice
         for (const k of clear) {
           const [r, c] = k.split(",").map(Number);
           decIceIfAny(r, c);
@@ -953,7 +982,6 @@
 
         updateHUD("");
 
-        // pop
         for (const k of clear) {
           const [r, c] = k.split(",").map(Number);
           const p = pieces[r][c];
@@ -987,7 +1015,6 @@
       swapPieces(from, to, true);
 
       setTimeout(() => {
-        // typed combos
         if (specialCombo(from, to)) return;
 
         const aNow = pieces[to.r][to.c];
@@ -1009,11 +1036,7 @@
         movesLeft--;
         updateHUD("");
 
-        if (immediateColor) {
-          addFlash(1.1);
-          addShake(1.0);
-        }
-
+        if (immediateColor) { addFlash(1.1); addShake(1.0); }
         resolveChain();
       }, CFG.swapMs + 10);
     }
@@ -1073,7 +1096,6 @@
       ctx.fillStyle = "#0f1722";
       ctx.fillRect(PADDING, PADDING, BOARD_SIZE, BOARD_SIZE);
 
-      // grid + ice
       for (let r = 0; r < GRID; r++) {
         for (let c = 0; c < GRID; c++) {
           ctx.strokeStyle = "rgba(232,238,246,0.08)";
@@ -1092,7 +1114,6 @@
         }
       }
 
-      // pieces
       for (let r = 0; r < GRID; r++) {
         for (let c = 0; c < GRID; c++) {
           const p = pieces[r][c];
@@ -1170,6 +1191,7 @@
       try {
         const data = {
           best, levelIndex, score, movesLeft, targetScore, objectives,
+          unlockedMax,
           grid: pieces.map((row) => row.map((p) => (p ? { t: p.type, s: p.special } : null))),
           ice,
         };
@@ -1215,10 +1237,20 @@
 
     function maybeResume() {
       const s = load();
-      if (!s || !s.grid) { best = 0; applyLevel(0, true); return; }
+      if (!s || !s.grid) {
+        best = 0;
+        unlockedMax = 1;
+        applyLevel(0, true);
+        return;
+      }
 
       best = Number(s.best ?? 0);
+      unlockedMax = clamp(Number(s.unlockedMax ?? 1), 1, LEVELS.length);
+
       levelIndex = clamp(Number(s.levelIndex ?? 0), 0, LEVELS.length - 1);
+      // sécurité : si un vieux save pointe vers un niveau non débloqué
+      if (levelIndex + 1 > unlockedMax) levelIndex = unlockedMax - 1;
+
       score = Number(s.score ?? 0);
       movesLeft = Number(s.movesLeft ?? LEVELS[levelIndex].moves);
       targetScore = Number(s.targetScore ?? LEVELS[levelIndex].targetScore);
@@ -1264,7 +1296,6 @@
     // ---------- LOOP ----------
     function tick() { draw(); requestAnimationFrame(tick); }
 
-    // start
     maybeResume();
     tick();
   } catch (err) {
