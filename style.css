@@ -1,12 +1,8 @@
 :root { color-scheme: dark; }
-
 * { box-sizing: border-box; }
 
 html, body { height: 100%; }
-
-html, body{
-  overscroll-behavior: none;
-}
+html, body { overscroll-behavior: none; }
 
 body{
   margin: 0;
@@ -20,7 +16,6 @@ body{
   overflow: hidden;
   touch-action: manipulation;
 
-  /* anti micro “rubber band” iOS */
   position: fixed;
   width: 100%;
 }
@@ -162,13 +157,7 @@ canvas{
 
 .dockTitle{ font-weight: 950; }
 .status{ opacity: 0.8; font-size: 13px; }
-
-.objectives{
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 6px;
-}
+.objectives{ margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 
 /* ===== Modal victoire ===== */
 .modal{
@@ -181,7 +170,6 @@ canvas{
   z-index: 50;
 }
 .hidden{ display: none; }
-
 .modalCard{
   width: min(92vw, 520px);
   border-radius: 18px;
@@ -191,23 +179,25 @@ canvas{
   padding: 16px 16px;
   box-shadow: 0 20px 50px rgba(0,0,0,0.45);
 }
+.modalTitle{ font-weight: 950; font-size: 22px; margin-bottom: 6px; }
+.modalText{ opacity: 0.9; margin-bottom: 12px; }
+.modalButtons{ display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 
-.modalTitle{
-  font-weight: 950;
-  font-size: 22px;
-  margin-bottom: 6px;
-}
-
-.modalText{
-  opacity: 0.9;
-  margin-bottom: 12px;
-}
-
-.modalButtons{
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+/* ===== Boot error overlay ===== */
+.bootError{
+  position: fixed;
+  inset: 14px;
+  z-index: 999;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.88);
+  padding: 14px;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre-wrap;
 }
 
 /* Mobile tweaks */
@@ -216,10 +206,6 @@ canvas{
   .actions{ justify-content: flex-start; }
   .card{ min-width: 86px; }
   .card .value{ font-size: 17px; }
-
   .dock{ max-height: 24vh; }
-  canvas{
-    width: min(92vw, 62vh, 560px);
-    height: min(92vw, 62vh, 560px);
-  }
+  canvas{ width: min(92vw, 62vh, 560px); height: min(92vw, 62vh, 560px); }
 }
