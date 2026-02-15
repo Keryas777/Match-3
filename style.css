@@ -10,9 +10,12 @@ body{
   background: #0b0f14;
   color: #e8eef6;
 
-  /* IMPORTANT : header + main qui remplit le reste */
+  /* header + main qui remplit le reste */
   display: grid;
   grid-template-rows: auto 1fr;
+
+  /* PATCH: empêche le scroll global (le dock scrolle à l'intérieur) */
+  overflow: hidden;
 }
 
 /* ===== Top bar ===== */
@@ -83,20 +86,22 @@ button{
 button:active{ transform: translateY(1px); }
 
 /* ===== Main layout ===== */
-/* Ici, main prend EXACTEMENT la place restante (grâce au body grid) */
 .layout{
   height: 100%;
-  min-height: 0;            /* crucial pour iOS */
+  min-height: 0;           /* crucial pour iOS */
   padding: 14px;
 
   display: grid;
-  grid-template-rows: 1fr auto; /* board centré + dock en bas */
+  grid-template-rows: 1fr auto; /* board + dock */
   gap: 12px;
+
+  /* PATCH: le main ne doit pas déborder */
+  overflow: hidden;
 }
 
 /* Board centered */
 .boardWrap{
-  min-height: 0;            /* crucial */
+  min-height: 0;           /* crucial */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -114,7 +119,7 @@ canvas{
   touch-action: none;
 }
 
-/* Dock bottom */
+/* ===== Dock bottom ===== */
 .dock{
   width: min(92vw, 560px);
   margin: 0 auto;
@@ -123,6 +128,24 @@ canvas{
   border: 1px solid rgba(232,238,246,0.12);
   border-radius: 16px;
   background: rgba(232,238,246,0.05);
+
+  /* PATCH: le dock ne dépasse jamais l'écran */
+  max-height: 28vh;        /* ajuste: 24vh à 34vh */
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+
+  /* BONUS: look "bottom sheet" */
+  position: relative;
+}
+
+.dock::before{
+  content: "";
+  display: block;
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  margin: 2px auto 10px auto;
+  background: rgba(232,238,246,0.18);
 }
 
 .dockHeader{
@@ -149,4 +172,8 @@ canvas{
   .actions{ justify-content: flex-start; }
   .card{ min-width: 86px; }
   .card .value{ font-size: 17px; }
+
+  /* Un peu plus de place au jeu sur très petit écran */
+  .dock{ max-height: 24vh; }
+  canvas{ width: min(92vw, 62vh, 560px); height: min(92vw, 62vh, 560px); }
 }
