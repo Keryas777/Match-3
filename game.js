@@ -88,7 +88,7 @@
       fxFlashMs: 160,
       shakeMs: 220,
 
-      beamMs: 260,
+      beamMs: 320,     // un peu plus long pour le sweep
       crossMs: 420,
     };
 
@@ -138,12 +138,13 @@
     let lastSwap = null;
 
     // ---------- FX ----------
+    // beams: {kind:"row"|"col", r|c, mode:"full"|"sweep", cx|cy, t0,dur,intensity}
     const fx = {
       bursts: [],
       flash: null,
       shake: null,
-      beams: [],   // row/col lasers
-      crosses: [], // cross pulses
+      beams: [],
+      crosses: [],
     };
 
     function addBurst(r, c, type, intensity = 1) {
@@ -156,11 +157,16 @@
     function addShake(intensity = 1) {
       fx.shake = { t0: now(), dur: CFG.shakeMs, intensity };
     }
-    function addBeamRow(r, intensity = 1) {
-      fx.beams.push({ kind: "row", r, t0: now(), dur: CFG.beamMs, intensity });
+
+    function addBeamRow(r, intensity = 1, mode = "full", centerC = null) {
+      const cy = PADDING + r * CELL + CELL / 2;
+      const cx = centerC == null ? (PADDING + BOARD_SIZE / 2) : (PADDING + centerC * CELL + CELL / 2);
+      fx.beams.push({ kind: "row", r, mode, cx, cy, t0: now(), dur: CFG.beamMs, intensity });
     }
-    function addBeamCol(c, intensity = 1) {
-      fx.beams.push({ kind: "col", c, t0: now(), dur: CFG.beamMs, intensity });
+    function addBeamCol(c, intensity = 1, mode = "full", centerR = null) {
+      const cx = PADDING + c * CELL + CELL / 2;
+      const cy = centerR == null ? (PADDING + BOARD_SIZE / 2) : (PADDING + centerR * CELL + CELL / 2);
+      fx.beams.push({ kind: "col", c, mode, cx, cy, t0: now(), dur: CFG.beamMs, intensity });
     }
     function addCross(r, c, intensity = 1) {
       const { x, y } = xyFromCell(r, c);
@@ -211,22 +217,52 @@
         ctx.globalAlpha = 1;
       }
 
-      // beams
+      // beams (full or sweep)
       fx.beams = fx.beams.filter((b) => t < b.t0 + b.dur);
       for (const b of fx.beams) {
         const p = clamp((t - b.t0) / b.dur, 0, 1);
-        const a = (1 - p) * 0.65 * b.intensity;
+        const e = easeOut(p);
+        const a = (1 - p) * 0.70 * b.intensity;
 
         ctx.globalAlpha = a;
         ctx.fillStyle = "#ffffff";
 
+        const thickness = 12;
+
         if (b.kind === "row") {
-          const y = PADDING + b.r * CELL + CELL / 2;
-          ctx.fillRect(PADDING, y - 6, BOARD_SIZE, 12);
+          const y = b.cy;
+          if (b.mode === "full") {
+            ctx.fillRect(PADDING, y - thickness/2, BOARD_SIZE, thickness);
+          } else {
+            // sweep depuis cx vers gauche/droite
+            const maxL = b.cx - PADDING;
+            const maxR = PADDING + BOARD_SIZE - b.cx;
+            const left = b.cx - maxL * e;
+            const width = (maxL + maxR) * e;
+            ctx.fillRect(left, y - thickness/2, width, thickness);
+
+            // petit "noyau" lumineux
+            ctx.globalAlpha = a * 0.9;
+            ctx.fillRect(b.cx - 18, y - 3, 36, 6);
+            ctx.globalAlpha = a;
+          }
         } else {
-          const x = PADDING + b.c * CELL + CELL / 2;
-          ctx.fillRect(x - 6, PADDING, 12, BOARD_SIZE);
+          const x = b.cx;
+          if (b.mode === "full") {
+            ctx.fillRect(x - thickness/2, PADDING, thickness, BOARD_SIZE);
+          } else {
+            const maxU = b.cy - PADDING;
+            const maxD = PADDING + BOARD_SIZE - b.cy;
+            const top = b.cy - maxU * e;
+            const height = (maxU + maxD) * e;
+            ctx.fillRect(x - thickness/2, top, thickness, height);
+
+            ctx.globalAlpha = a * 0.9;
+            ctx.fillRect(x - 3, b.cy - 18, 6, 36);
+            ctx.globalAlpha = a;
+          }
         }
+
         ctx.globalAlpha = 1;
       }
 
@@ -565,15 +601,13 @@
       if (!p || !p.special) return;
 
       if (p.special === "row") {
-        addBeamRow(r, 1.15);
+        addBeamRow(r, 1.15, "full");
         addShake(0.7);
         for (let cc = 0; cc < GRID; cc++) clearSet.add(keyOf(r, cc));
-
       } else if (p.special === "col") {
-        addBeamCol(c, 1.15);
+        addBeamCol(c, 1.15, "full");
         addShake(0.7);
         for (let rr = 0; rr < GRID; rr++) clearSet.add(keyOf(rr, c));
-
       } else if (p.special === "bomb") {
         addBurst(r, c, p.type, 1.9);
         addFlash(0.7);
@@ -581,12 +615,10 @@
         for (let rr = r - 1; rr <= r + 1; rr++)
           for (let cc = c - 1; cc <= c + 1; cc++)
             if (inBounds(rr, cc)) clearSet.add(keyOf(rr, cc));
-
       } else if (p.special === "color") {
         addFlash(1.25);
         addShake(1.1);
 
-        // choose target type (from last swap partner if possible)
         let targetType = null;
         if (lastSwap) {
           const a = lastSwap.a, b = lastSwap.b;
@@ -611,7 +643,6 @@
       else if (size === 4) bonus = group.orientation === "h" ? "row" : "col";
       if (!bonus) return null;
 
-      // place bonus on swapped cell if possible
       let place = null;
       if (lastSwap) {
         const set = new Set(group.cells.map((c) => keyOf(c.r, c.c)));
@@ -624,7 +655,6 @@
       if (!p) return null;
       p.special = bonus;
 
-      // “creation” feedback
       if (bonus === "row" || bonus === "col") { addBurst(place.r, place.c, p.type, 1.25); addShake(0.6); }
       else if (bonus === "bomb") { addBurst(place.r, place.c, p.type, 1.6); addShake(0.85); }
       else if (bonus === "color") { addBurst(place.r, place.c, p.type, 2.4); addFlash(1.1); addShake(1.1); }
@@ -655,7 +685,6 @@
     }
 
     function applyClearSet(clear, scoreBonus = 0) {
-      // count
       const counts = new Map();
       for (const k of clear) {
         const [r, c] = k.split(",").map(Number);
@@ -664,18 +693,14 @@
       }
       for (const [t, cnt] of counts.entries()) applyCollect(String(t), cnt);
 
-      // ice
       for (const k of clear) {
         const [r, c] = k.split(",").map(Number);
         decIceIfAny(r, c);
       }
 
-      // score
       score += clear.size * 10 + scoreBonus;
-
       updateHUD("");
 
-      // pop + remove
       for (const k of clear) {
         const [r, c] = k.split(",").map(Number);
         const p = pieces[r][c];
@@ -695,58 +720,95 @@
       const b = pieces[from.r][from.c]; // moved into "from"
       if (!a || !b || !a.special || !b.special) return false;
 
-      // consume a move
       movesLeft--;
       updateHUD("");
 
       const sa = a.special;
       const sb = b.special;
 
-      // helper: clear + fx
       const doClear = (clear, fxKind) => {
         state = "BUSY";
         input.locked = true;
 
-        if (fxKind === "doubleCross") {
-          addCross(from.r, from.c, 1.25);
-          addCross(to.r, to.c, 1.25);
+        if (fxKind === "rowcol_sweep") {
+          // sweep laser depuis le point d’impact (to) + une croix sur les 2 cases
+          addCross(from.r, from.c, 1.15);
+          addCross(to.r, to.c, 1.35);
+          addBeamRow(to.r, 1.25, "sweep", to.c);
+          addBeamCol(to.c, 1.25, "sweep", to.r);
           addFlash(1.0);
-          addShake(1.25);
+          addShake(1.35);
+
+        } else if (fxKind === "rowrow") {
+          addCross(from.r, from.c, 1.1);
+          addCross(to.r, to.c, 1.1);
+          addBeamRow(from.r, 1.15, "full");
+          addBeamRow(to.r, 1.15, "full");
+          addShake(1.1);
+
+        } else if (fxKind === "colcol") {
+          addCross(from.r, from.c, 1.1);
+          addCross(to.r, to.c, 1.1);
+          addBeamCol(from.c, 1.15, "full");
+          addBeamCol(to.c, 1.15, "full");
+          addShake(1.1);
+
         } else if (fxKind === "bombCross") {
           addCross(to.r, to.c, 1.35);
           addBurst(to.r, to.c, a.type, 2.0);
           addFlash(1.0);
           addShake(1.35);
+
         } else if (fxKind === "bombBomb") {
           addBurst(to.r, to.c, a.type, 2.8);
           addFlash(1.25);
           addShake(1.6);
+
         } else if (fxKind === "colorColor") {
           addFlash(1.6);
           addShake(1.7);
           addCross(to.r, to.c, 1.5);
+
         } else if (fxKind === "colorMorph") {
           addFlash(1.25);
           addShake(1.35);
           addCross(to.r, to.c, 1.2);
         }
 
-        applyClearSet(clear, 120);
+        applyClearSet(clear, 140);
       };
 
-      // normalize: treat pair
-      const pair = [sa, sb].sort().join("+");
-
-      // row+col (any order) => double cross centered on BOTH cells
-      if (pair === "col+row") {
-        const clear = new Set([...buildCrossSet(from.r, from.c), ...buildCrossSet(to.r, to.c)]);
-        doClear(clear, "doubleCross");
+      // row+col => sweep laser + croix
+      if ((sa === "row" && sb === "col") || (sa === "col" && sb === "row")) {
+        const clear = buildCrossSet(to.r, to.c);
+        // + on ajoute aussi les deux cases swap pour être sûr
+        clear.add(keyOf(from.r, from.c));
+        clear.add(keyOf(to.r, to.c));
+        doClear(clear, "rowcol_sweep");
         return true;
       }
 
-      // bomb + row/col => cross + 3x3 around center(to)
+      // row+row => 2 rangées
+      if (sa === "row" && sb === "row") {
+        const clear = new Set();
+        for (let cc = 0; cc < GRID; cc++) clear.add(keyOf(from.r, cc));
+        for (let cc = 0; cc < GRID; cc++) clear.add(keyOf(to.r, cc));
+        doClear(clear, "rowrow");
+        return true;
+      }
+
+      // col+col => 2 colonnes
+      if (sa === "col" && sb === "col") {
+        const clear = new Set();
+        for (let rr = 0; rr < GRID; rr++) clear.add(keyOf(rr, from.c));
+        for (let rr = 0; rr < GRID; rr++) clear.add(keyOf(rr, to.c));
+        doClear(clear, "colcol");
+        return true;
+      }
+
+      // bomb + row/col => cross + 3x3
       if ((sa === "bomb" && (sb === "row" || sb === "col")) || (sb === "bomb" && (sa === "row" || sa === "col"))) {
-        const center = to; // feel better visually: impact where you dragged
+        const center = to;
         const clear = new Set([...buildCrossSet(center.r, center.c), ...buildSquareSet(center.r, center.c, 1)]);
         doClear(clear, "bombCross");
         return true;
@@ -768,17 +830,12 @@
 
       // color + (row/col/bomb) => morph target color into that special then detonate them
       if (sa === "color" || sb === "color") {
-        const colorPiece = (sa === "color") ? a : b;
         const otherPiece = (sa === "color") ? b : a; // row/col/bomb
-        const morphTo = otherPiece.special; // row/col/bomb
+        const morphTo = otherPiece.special;
 
-        // target type = color of the non-color piece
         const targetType = otherPiece.type;
 
-        // transform all targetType into morphTo, then clear by triggering specials
         const clear = new Set();
-
-        // include the two swapped cells no matter what
         clear.add(keyOf(from.r, from.c));
         clear.add(keyOf(to.r, to.c));
 
@@ -786,36 +843,31 @@
         for (let r = 0; r < GRID; r++) {
           for (let c = 0; c < GRID; c++) {
             const p = pieces[r][c];
-            if (!p) continue;
-            if (p.type === targetType) p.special = morphTo;
+            if (p && p.type === targetType) p.special = morphTo;
           }
         }
 
-        // trigger all morphed specials (build a clear set through triggerSpecialAt)
+        // trigger all morphed specials
         for (let r = 0; r < GRID; r++) {
           for (let c = 0; c < GRID; c++) {
             const p = pieces[r][c];
             if (p && p.type === targetType) {
-              // add their own cell
               clear.add(keyOf(r, c));
-              // expand as special
               triggerSpecialAt(r, c, clear);
             }
           }
         }
 
-        // extra FX: lasers feel if row/col
-        if (morphTo === "row") addBeamRow(to.r, 1.15);
-        if (morphTo === "col") addBeamCol(to.c, 1.15);
+        if (morphTo === "row") addBeamRow(to.r, 1.15, "full");
+        if (morphTo === "col") addBeamCol(to.c, 1.15, "full");
         if (morphTo === "bomb") addBurst(to.r, to.c, otherPiece.type, 2.2);
 
         doClear(clear, "colorMorph");
         return true;
       }
 
-      // default: if special+special but not covered, fallback to single cross
-      const fallback = buildCrossSet(to.r, to.c);
-      doClear(fallback, "doubleCross");
+      // fallback: cross
+      doClear(buildCrossSet(to.r, to.c), "rowcol_sweep");
       return true;
     }
 
@@ -935,7 +987,7 @@
       swapPieces(from, to, true);
 
       setTimeout(() => {
-        // NEW: combo special+special typed
+        // typed combos
         if (specialCombo(from, to)) return;
 
         const aNow = pieces[to.r][to.c];
@@ -958,7 +1010,6 @@
         updateHUD("");
 
         if (immediateColor) {
-          // let resolveChain handle it via triggerSpecialAt expansions, but add some punch
           addFlash(1.1);
           addShake(1.0);
         }
@@ -1047,7 +1098,6 @@
           const p = pieces[r][c];
           if (!p || !p.active) continue;
 
-          // move anim
           if (p.t1 > p.t0) {
             const tt = clamp((now() - p.t0) / (p.t1 - p.t0), 0, 1);
             const e = easeOut(tt);
@@ -1056,7 +1106,6 @@
             if (tt >= 1) { p.x = p.tx; p.y = p.ty; p.t0 = p.t1 = 0; }
           }
 
-          // pop anim
           let scale = 1;
           if (p.popping) {
             const tt = clamp((now() - p.popT0) / (p.popT1 - p.popT0), 0, 1);
@@ -1067,7 +1116,6 @@
           const radius = CELL * 0.33 * scale;
           if (radius <= 0.6) continue;
 
-          // special glow
           if (p.special) {
             ctx.globalAlpha = 0.22;
             ctx.fillStyle = "#fff";
@@ -1077,13 +1125,11 @@
             ctx.globalAlpha = 1;
           }
 
-          // base
           ctx.fillStyle = COLORS[p.type];
           ctx.beginPath();
           ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
           ctx.fill();
 
-          // shine
           ctx.globalAlpha = 0.18;
           ctx.fillStyle = "#fff";
           ctx.beginPath();
@@ -1091,7 +1137,6 @@
           ctx.fill();
           ctx.globalAlpha = 1;
 
-          // marker (simple)
           if (p.special) {
             ctx.strokeStyle = "rgba(255,255,255,0.85)";
             ctx.lineWidth = 3;
@@ -1109,7 +1154,6 @@
         }
       }
 
-      // selection
       if (input.start) {
         const { r, c } = input.start;
         ctx.strokeStyle = "rgba(255,255,255,0.7)";
