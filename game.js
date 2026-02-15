@@ -1,5 +1,18 @@
 /* Match-3 V3: Bonus + Niveaux + Objectifs (Canvas / Mobile / GitHub Pages) */
 
+/* --- iOS: block pinch-to-zoom / double-tap zoom --- */
+document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
+document.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
+
+// Double-tap zoom (certaines versions iOS)
+let __lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+  const t = Date.now();
+  if (t - __lastTouchEnd <= 300) e.preventDefault();
+  __lastTouchEnd = t;
+}, { passive: false });
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
@@ -40,7 +53,7 @@ const LEVELS = [
     moves: 20,
     targetScore: 800,
     collect: { 0: 12, 3: 10 }, // 12 rouges, 10 bleus
-    ice: 8, // nombre de cases "glace"
+    ice: 8, // cases glace
   },
   {
     moves: 22,
@@ -154,8 +167,8 @@ function updateHUD(msg = "") {
   el.best.textContent = String(best);
   el.moves.textContent = String(movesLeft);
 
-  // objectives list
   el.objectives.innerHTML = "";
+
   const liScore = document.createElement("li");
   liScore.textContent = `Atteindre ${targetScore} points (${score}/${targetScore})`;
   el.objectives.appendChild(liScore);
@@ -214,7 +227,6 @@ function buildNewBoardNoMatches() {
 }
 
 function placeIce(count) {
-  // Put ice on random cells (no duplicates)
   const cells = [];
   for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) cells.push({ r, c });
   for (let i = cells.length - 1; i > 0; i--) {
@@ -231,7 +243,6 @@ function placeIce(count) {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // board background
   ctx.fillStyle = "#0f1722";
   ctx.fillRect(PADDING, PADDING, BOARD_SIZE, BOARD_SIZE);
 
@@ -257,7 +268,6 @@ function draw() {
       const p = pieces[r][c];
       if (!p || !p.active) continue;
 
-      // move anim
       if (p.t1 > p.t0) {
         const t = clamp((now() - p.t0) / (p.t1 - p.t0), 0, 1);
         const e = easeOutCubic(t);
@@ -266,7 +276,6 @@ function draw() {
         if (t >= 1) { p.x = p.tx; p.y = p.ty; p.t0 = p.t1 = 0; }
       }
 
-      // pop anim scale
       let scale = 1;
       if (p.popping) {
         const t = clamp((now() - p.popT0) / (p.popT1 - p.popT0), 0, 1);
@@ -277,13 +286,11 @@ function draw() {
       const radius = CELL * 0.33 * scale;
       if (radius <= 0.6) continue;
 
-      // base circle
       ctx.beginPath();
       ctx.fillStyle = COLORS[p.type];
       ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // shine
       ctx.globalAlpha = 0.18;
       ctx.beginPath();
       ctx.fillStyle = "#ffffff";
@@ -321,7 +328,6 @@ function draw() {
     }
   }
 
-  // selection highlight
   if (input.start) {
     const { r, c } = input.start;
     ctx.strokeStyle = "rgba(255,255,255,0.65)";
@@ -329,7 +335,6 @@ function draw() {
     ctx.strokeRect(PADDING + c * CELL + 2, PADDING + r * CELL + 2, CELL - 4, CELL - 4);
   }
 
-  // overlays
   if (state === "WIN" || state === "GAMEOVER") {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(PADDING, PADDING, BOARD_SIZE, BOARD_SIZE);
@@ -346,10 +351,9 @@ function draw() {
  * group = { cells:[{r,c}...], type, shape:"line"|"tl", orientation:"h"|"v"|null }
  */
 function findMatchGroups() {
-  const used = new Set();
   const groups = [];
 
-  // helper to collect a run horizontally
+  // horizontal runs
   for (let r = 0; r < GRID; r++) {
     let runType = pieces[r][0]?.type ?? null;
     let runStart = 0;
@@ -391,8 +395,7 @@ function findMatchGroups() {
     }
   }
 
-  // Merge overlaps into larger "combo group" (to detect T/L)
-  // Simple union-find-ish via iterative merge on cell overlap.
+  // merge overlaps (T/L detection)
   let merged = true;
   while (merged) {
     merged = false;
@@ -402,7 +405,6 @@ function findMatchGroups() {
         const setA = new Set(groups[i].cells.map(c => keyOf(c.r, c.c)));
         const overlap = groups[j].cells.some(c => setA.has(keyOf(c.r, c.c)));
         if (overlap) {
-          // merge j into i
           const map = new Map();
           for (const c of groups[i].cells) map.set(keyOf(c.r, c.c), c);
           for (const c of groups[j].cells) map.set(keyOf(c.r, c.c), c);
@@ -415,7 +417,6 @@ function findMatchGroups() {
     }
   }
 
-  // Deduplicate groups that are identical (rare)
   const uniq = [];
   const seen = new Set();
   for (const g of groups) {
@@ -425,9 +426,7 @@ function findMatchGroups() {
     uniq.push(g);
   }
 
-  // mark shape
   for (const g of uniq) {
-    // Count distinct rows/cols
     const rows = new Set(g.cells.map(c => c.r));
     const cols = new Set(g.cells.map(c => c.c));
     const isLine = (rows.size === 1) || (cols.size === 1);
@@ -462,13 +461,11 @@ function applyGravityAndRefillAnimated() {
       if (p && p.active) col.push(p);
     }
 
-    // refill from above
     while (col.length < GRID) {
       const spawnIndex = col.length;
       const newR = -1 - spawnIndex;
       const t = randType();
       const p = makePiece(newR, c, t, null);
-      // start above
       const { x } = xyFromCell(0, c);
       p.x = x;
       p.y = PADDING + (newR * CELL) + CELL / 2;
@@ -478,7 +475,6 @@ function applyGravityAndRefillAnimated() {
     for (let r = GRID - 1; r >= 0; r--) {
       const p = col[GRID - 1 - r];
       pieces[r][c] = p;
-
       setPieceCell(p, r, c);
       startMoveAnim(p, CFG.fallMs);
       maxMs = Math.max(maxMs, CFG.fallMs);
@@ -536,8 +532,6 @@ function triggerSpecialAt(r, c, extraClears) {
       }
     }
   } else if (p.special === "color") {
-    // clear all of some target color:
-    // If lastSwap exists and we swapped with a normal piece, use that color; else use random.
     let target = null;
     if (lastSwap) {
       const a = lastSwap.a, b = lastSwap.b;
@@ -555,24 +549,16 @@ function triggerSpecialAt(r, c, extraClears) {
   }
 }
 
-function createBonusFromGroup(group, anchorCell) {
-  // group: cells + shape + orientation + type
+function createBonusFromGroup(group) {
   const size = group.cells.length;
 
-  // Decide bonus type
   let bonus = null;
-  if (group.shape === "tl") {
-    bonus = "bomb";
-  } else if (size >= 5) {
-    bonus = "color";
-  } else if (size === 4) {
-    // line bonus depends on orientation
-    bonus = (group.orientation === "h") ? "row" : "col";
-  }
+  if (group.shape === "tl") bonus = "bomb";
+  else if (size >= 5) bonus = "color";
+  else if (size === 4) bonus = (group.orientation === "h") ? "row" : "col";
 
   if (!bonus) return null;
 
-  // Anchor: prefer a swapped cell inside the group (feels natural)
   let place = null;
   if (lastSwap) {
     const a = lastSwap.a, b = lastSwap.b;
@@ -580,14 +566,12 @@ function createBonusFromGroup(group, anchorCell) {
     if (set.has(keyOf(a.r, a.c))) place = { r: a.r, c: a.c };
     else if (set.has(keyOf(b.r, b.c))) place = { r: b.r, c: b.c };
   }
-  if (!place && anchorCell) place = anchorCell;
   if (!place) place = group.cells[Math.floor(group.cells.length / 2)];
 
-  // Create bonus piece at place: it must SURVIVE, so we remove other cells but keep this one.
   const p = pieces[place.r][place.c];
   if (!p) return null;
   p.special = bonus;
-  return place; // cell that should NOT be cleared
+  return place;
 }
 
 function resolveChain() {
@@ -595,7 +579,6 @@ function resolveChain() {
   input.locked = true;
 
   const step = () => {
-    // 1) find groups
     const groups = findMatchGroups();
     if (groups.length === 0) {
       state = "IDLE";
@@ -607,18 +590,14 @@ function resolveChain() {
       return;
     }
 
-    // 2) build clear set
     const clear = new Set();
-    const keep = new Set(); // cells to keep because they become bonuses
+    const keep = new Set();
 
-    // create bonuses first (so we can keep their cells)
     for (const g of groups) {
-      // anchor: none (we handle via lastSwap preference)
-      const keptCell = createBonusFromGroup(g, null);
+      const keptCell = createBonusFromGroup(g);
       if (keptCell) keep.add(keyOf(keptCell.r, keptCell.c));
     }
 
-    // add group cells to clear (except kept bonus cell)
     for (const g of groups) {
       for (const c of g.cells) {
         const k = keyOf(c.r, c.c);
@@ -626,7 +605,6 @@ function resolveChain() {
       }
     }
 
-    // 3) specials chain reaction: if a special is in the clear set, expand clear
     let expanded = true;
     while (expanded) {
       expanded = false;
@@ -634,9 +612,7 @@ function resolveChain() {
       for (const k of clear) {
         const [r, c] = k.split(",").map(Number);
         const p = pieces[r][c];
-        if (p && p.special) {
-          triggerSpecialAt(r, c, extra);
-        }
+        if (p && p.special) triggerSpecialAt(r, c, extra);
       }
       for (const k of extra) {
         if (!clear.has(k) && !keep.has(k)) {
@@ -647,17 +623,13 @@ function resolveChain() {
     }
 
     if (clear.size === 0) {
-      // safety
       const fallMs = applyGravityAndRefillAnimated();
       setTimeout(step, fallMs + CFG.chainDelay);
       return;
     }
 
-    // 4) apply objectives & score
-    // score: 10 per piece, + bonus for chain complexity
     score += clear.size * 10 + Math.max(0, groups.length - 1) * 20;
 
-    // collect counts by type (only non-null)
     const typeCounts = new Map();
     for (const k of clear) {
       const [r, c] = k.split(",").map(Number);
@@ -666,7 +638,6 @@ function resolveChain() {
     }
     for (const [t, cnt] of typeCounts.entries()) applyCollect(String(t), cnt);
 
-    // ice breaks when the piece in that cell is cleared
     for (const k of clear) {
       const [r, c] = k.split(",").map(Number);
       decIceIfAny(r, c);
@@ -674,7 +645,6 @@ function resolveChain() {
 
     updateHUD("");
 
-    // 5) pop & remove
     for (const k of clear) {
       const [r, c] = k.split(",").map(Number);
       const p = pieces[r][c];
@@ -682,7 +652,6 @@ function resolveChain() {
       pieces[r][c] = null;
     }
 
-    // 6) wait pop, then gravity, then next step
     setTimeout(() => {
       const fallMs = applyGravityAndRefillAnimated();
       setTimeout(step, fallMs + CFG.chainDelay);
@@ -707,14 +676,9 @@ function tryMove(from, to) {
 
   lastSwap = { a: { ...from }, b: { ...to } };
 
-  // Special + Special: allow big combo
-  const pa = pieces[from.r][from.c];
-  const pb = pieces[to.r][to.c];
-
   swapPieces(from, to, true);
 
   setTimeout(() => {
-    // if either is "color" and swapped with something: trigger immediately even without match
     const aNow = pieces[to.r][to.c];
     const bNow = pieces[from.r][from.c];
 
@@ -722,7 +686,6 @@ function tryMove(from, to) {
     const hasMatches = findMatchGroups().length > 0;
 
     if (!immediate && !hasMatches) {
-      // swap back
       swapPieces(from, to, true);
       setTimeout(() => {
         state = "IDLE";
@@ -732,18 +695,13 @@ function tryMove(from, to) {
       return;
     }
 
-    // valid move
     movesLeft--;
     updateHUD("");
 
-    // if immediate color bomb activation: clear set created now
     if (immediate) {
-      // force clear via adding the color bomb cell to the board match resolution pipeline:
-      // We simulate by clearing the bomb itself + all of target color.
       const clear = new Set();
       const extra = new Set();
 
-      // find where the color bomb is
       let bombCell = null;
       if (aNow?.special === "color") bombCell = { r: to.r, c: to.c };
       if (bNow?.special === "color") bombCell = { r: from.r, c: from.c };
@@ -754,8 +712,8 @@ function tryMove(from, to) {
       }
       for (const k of extra) clear.add(k);
 
-      // score & objectives
       score += clear.size * 10 + 50;
+
       const counts = new Map();
       for (const k of clear) {
         const [r, c] = k.split(",").map(Number);
@@ -763,13 +721,13 @@ function tryMove(from, to) {
         if (p) counts.set(p.type, (counts.get(p.type) || 0) + 1);
       }
       for (const [t, cnt] of counts.entries()) applyCollect(String(t), cnt);
+
       for (const k of clear) {
         const [r, c] = k.split(",").map(Number);
         decIceIfAny(r, c);
       }
       updateHUD("");
 
-      // pop remove
       for (const k of clear) {
         const [r, c] = k.split(",").map(Number);
         const p = pieces[r][c];
@@ -779,16 +737,12 @@ function tryMove(from, to) {
 
       setTimeout(() => {
         const fallMs = applyGravityAndRefillAnimated();
-        setTimeout(() => {
-          // then normal chain resolution
-          resolveChain();
-        }, fallMs + CFG.chainDelay);
+        setTimeout(() => resolveChain(), fallMs + CFG.chainDelay);
       }, CFG.popMs + CFG.chainDelay);
 
       return;
     }
 
-    // normal resolve
     resolveChain();
   }, CFG.swapMs + 10);
 }
@@ -865,12 +819,6 @@ function applyLevel(index, fresh = true) {
   saveGame();
 }
 
-function newGame() {
-  const s = loadSave();
-  best = Number(s?.best ?? 0);
-  applyLevel(levelIndex, true);
-}
-
 function nextLevel() {
   if (levelIndex < LEVELS.length - 1) {
     applyLevel(levelIndex + 1, true);
@@ -895,7 +843,6 @@ function maybeResume() {
   targetScore = Number(s.targetScore ?? LEVELS[levelIndex].targetScore);
   objectives = s.objectives ?? { collect: {}, iceLeft: 0 };
 
-  // rebuild grid
   pieces = Array.from({ length: GRID }, (_, r) =>
     Array.from({ length: GRID }, (_, c) => {
       const cell = s.grid?.[r]?.[c];
