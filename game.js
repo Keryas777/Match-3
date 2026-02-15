@@ -66,7 +66,7 @@
       shakeMs: 220,
     };
 
-const SAVE_KEY = "match3_v2_save_reset1";
+    const SAVE_KEY = "match3_v2_save_reset1";
     const now = () => performance.now();
     const clamp = (n,a,b) => Math.max(a, Math.min(b, n));
     const easeOut = (t) => 1 - Math.pow(1 - t, 3);
