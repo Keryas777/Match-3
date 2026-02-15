@@ -5,7 +5,7 @@
   <meta name="viewport"
         content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Match-3</title>
-  <link rel="stylesheet" href="./style.css?v=2100" />
+  <link rel="stylesheet" href="./style.css?v=2200" />
 </head>
 
 <body>
@@ -32,6 +32,7 @@
 
     <div class="actions">
       <button id="newGame" type="button">Recommencer</button>
+      <button id="openLevels" type="button">Niveaux</button>
     </div>
   </header>
 
@@ -57,6 +58,7 @@
       <div class="modalButtons">
         <button id="winRestart" type="button">Recommencer</button>
         <button id="winNext" type="button">Niveau suivant</button>
+        <button id="winLevels" type="button">Menu niveaux</button>
       </div>
     </div>
   </div>
@@ -66,8 +68,22 @@
     <div class="modalCard">
       <div class="modalTitle">💀 Game Over</div>
       <div class="modalText" id="loseText">Objectifs non atteints…</div>
+      <ul class="modalList" id="loseDetails"></ul>
       <div class="modalButtons">
-        <button id="loseRestart" type="button">Recommencer</button>
+        <button id="loseRestart" type="button">Réessayer</button>
+        <button id="loseLevels" type="button">Menu niveaux</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal menu niveaux -->
+  <div id="levelsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Menu niveaux">
+    <div class="modalCard">
+      <div class="modalTitle">🗺️ Choisir un niveau</div>
+      <div class="modalText">Sélectionne un niveau à lancer.</div>
+      <div id="levelsGrid" class="levelsGrid"></div>
+      <div class="modalButtons">
+        <button id="levelsClose" type="button">Fermer</button>
       </div>
     </div>
   </div>
@@ -75,6 +91,6 @@
   <!-- Overlay d’erreur (si crash JS) -->
   <div id="bootError" class="bootError hidden"></div>
 
-  <script src="./game.js?v=2100"></script>
+  <script src="./game.js?v=2200"></script>
 </body>
 </html>
