@@ -48,8 +48,17 @@ button:disabled{ opacity: 0.45; cursor: not-allowed; }
   padding: 8px 10px;
   min-width: 92px;
 }
-.card .label{ font-size: 12px; opacity: 0.78; }
-.card .value{ font-size: 18px; font-weight: 850; margin-top: 2px; }
+
+.card .label{
+  font-size: 12px;
+  opacity: 0.78;
+}
+
+.card .value{
+  font-size: 18px;
+  font-weight: 850;
+  margin-top: 2px;
+}
 
 .actions{
   display: flex;
@@ -57,7 +66,7 @@ button:disabled{ opacity: 0.45; cursor: not-allowed; }
 }
 
 .layout{
-  height: calc(100vh - 72px);
+  height: calc(100dvh - 72px);
   display: grid;
   grid-template-columns: 1fr 320px;
   gap: 12px;
@@ -75,8 +84,8 @@ button:disabled{ opacity: 0.45; cursor: not-allowed; }
 }
 
 canvas#game{
-  width: min(70vh, 92vw);
-  height: min(70vh, 92vw);
+  width: min(68dvh, 92vw);
+  height: min(68dvh, 92vw);
   touch-action: none;
 }
 
@@ -95,7 +104,7 @@ canvas#game{
   gap: 8px;
 }
 
-/* ✅ Mobile fix: objectifs visibles + topbar sur plusieurs lignes */
+/* ✅ Mobile fix: objectifs plus haut + canvas un poil plus petit */
 @media (max-width: 980px){
   .topbar{
     grid-template-columns: 1fr;
@@ -115,18 +124,19 @@ canvas#game{
   .layout{
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
+    gap: 10px;
   }
 
-  /* ✅ Objectifs visibles sur mobile */
   .dock{
     display: block;
-    max-height: 22vh;  /* évite que ça prenne tout l’écran */
-    overflow: auto;    /* scroll interne si trop long */
+    max-height: 18dvh;
+    overflow: auto;
+    padding: 10px;
   }
 
   canvas#game{
-    width: min(70vh, 96vw);
-    height: min(70vh, 96vw);
+    width: min(60dvh, 96vw);
+    height: min(60dvh, 96vw);
   }
 }
 
@@ -249,3 +259,8 @@ canvas#game{
   font-size: 14px;
   opacity: 0.95;
 }
+
+/* === Compact objectives spacing === */
+.dock h2{ margin: 0 0 8px 0; }
+.objectives{ gap: 6px; }
+.objectives li{ margin: 4px 0; }
