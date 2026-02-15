@@ -3,27 +3,33 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Match-3</title>
+  <title>Match-3 V3</title>
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
   <header class="topbar">
     <div class="title">Match-3</div>
-<div class="hud">
-  <span>Score: <b id="score">0</b></span>
-  <span>Best: <b id="best">0</b></span>
-  <span>Coups: <b id="moves">0</b></span>
-  <span>Objectif: <b id="target">0</b></span>
-  <button id="newGame" type="button">Nouvelle partie</button>
-</div>
+
+    <div class="hud">
+      <span>Niv: <b id="level">1</b></span>
+      <span>Score: <b id="score">0</b></span>
+      <span>Best: <b id="best">0</b></span>
+      <span>Coups: <b id="moves">0</b></span>
+
+      <button id="newGame" type="button">Recommencer</button>
+      <button id="nextLevel" type="button">Niveau suivant</button>
+    </div>
   </header>
 
   <main class="wrap">
     <canvas id="game" width="640" height="640" aria-label="Jeu match-3"></canvas>
-    <div class="hint">
-      Glisse un pion vers un voisin (haut/bas/gauche/droite).<br/>
-      Match = 3+ identiques.
-    </div>
+
+    <section class="panel" aria-label="Objectifs du niveau">
+      <div class="panelTitle">Objectifs</div>
+      <ul id="objectives"></ul>
+      <div id="status" class="status"></div>
+    </section>
   </main>
 
   <script src="game.js"></script>
