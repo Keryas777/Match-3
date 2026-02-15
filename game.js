@@ -10,11 +10,10 @@
   };
 
   try {
-    // --- iOS: block pinch-to-zoom / double-tap zoom ---
+    // iOS: block pinch/double-tap zoom
     document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
     document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
     document.addEventListener("gestureend", (e) => e.preventDefault(), { passive: false });
-
     let __lastTouchEnd = 0;
     document.addEventListener(
       "touchend",
@@ -40,32 +39,31 @@
       status: document.getElementById("status"),
       newGame: document.getElementById("newGame"),
 
+      openLevels: document.getElementById("openLevels"),
+
       winModal: document.getElementById("winModal"),
       winText: document.getElementById("winText"),
       winRestart: document.getElementById("winRestart"),
       winNext: document.getElementById("winNext"),
+      winLevels: document.getElementById("winLevels"),
 
-      // NEW: game over
       loseModal: document.getElementById("loseModal"),
       loseText: document.getElementById("loseText"),
+      loseDetails: document.getElementById("loseDetails"),
       loseRestart: document.getElementById("loseRestart"),
+      loseLevels: document.getElementById("loseLevels"),
+
+      levelsModal: document.getElementById("levelsModal"),
+      levelsGrid: document.getElementById("levelsGrid"),
+      levelsClose: document.getElementById("levelsClose"),
     };
 
     const must = [
-      "level",
-      "score",
-      "best",
-      "moves",
-      "objectives",
-      "status",
-      "newGame",
-      "winModal",
-      "winText",
-      "winRestart",
-      "winNext",
-      "loseModal",
-      "loseText",
-      "loseRestart",
+      "level","score","best","moves","objectives","status","newGame",
+      "openLevels",
+      "winModal","winText","winRestart","winNext","winLevels",
+      "loseModal","loseText","loseDetails","loseRestart","loseLevels",
+      "levelsModal","levelsGrid","levelsClose"
     ];
     for (const k of must) if (!ui[k]) throw new Error(`Element manquant: ${k}`);
 
@@ -84,7 +82,6 @@
       fallMs: 180,
       popMs: 160,
       chainGap: 60,
-
       fxBurstMs: 450,
       fxFlashMs: 160,
       shakeMs: 220,
@@ -100,7 +97,7 @@
     const randType = () => Math.floor(Math.random() * TYPES);
 
     const LEVELS = [
-      { moves: 20, targetScore: 800, collect: { 0: 12, 3: 10 }, ice: 8 },
+      { moves: 20, targetScore: 800,  collect: { 0: 12, 3: 10 }, ice: 8  },
       { moves: 22, targetScore: 1200, collect: { 2: 14, 5: 12 }, ice: 12 },
       { moves: 25, targetScore: 1800, collect: { 1: 18, 4: 14 }, ice: 16 },
     ];
@@ -120,11 +117,7 @@
     let input = { down: false, start: null, locked: false };
     let lastSwap = null;
 
-    const fx = {
-      bursts: [],
-      flash: null,
-      shake: null,
-    };
+    const fx = { bursts: [], flash: null, shake: null };
 
     const xyFromCell = (r, c) => ({
       x: PADDING + c * CELL + CELL / 2,
@@ -144,21 +137,14 @@
       const { x, y } = xyFromCell(r, c);
       fx.bursts.push({ x, y, color: COLORS[type], intensity, t0: now(), dur: CFG.fxBurstMs });
     }
-    function addFlash(intensity = 1) {
-      fx.flash = { t0: now(), dur: CFG.fxFlashMs, intensity };
-    }
-    function addShake(intensity = 1) {
-      fx.shake = { t0: now(), dur: CFG.shakeMs, intensity };
-    }
+    function addFlash(intensity = 1) { fx.flash = { t0: now(), dur: CFG.fxFlashMs, intensity }; }
+    function addShake(intensity = 1) { fx.shake = { t0: now(), dur: CFG.shakeMs, intensity }; }
 
     function getShakeOffset() {
       if (!fx.shake) return { dx: 0, dy: 0 };
       const t = now();
       const p = clamp((t - fx.shake.t0) / fx.shake.dur, 0, 1);
-      if (p >= 1) {
-        fx.shake = null;
-        return { dx: 0, dy: 0 };
-      }
+      if (p >= 1) { fx.shake = null; return { dx: 0, dy: 0 }; }
       const a = (1 - p) * 6 * fx.shake.intensity;
       const dx = (Math.sin(t * 0.08) + Math.sin(t * 0.13)) * 0.5 * a;
       const dy = (Math.cos(t * 0.09) + Math.cos(t * 0.11)) * 0.5 * a;
@@ -204,72 +190,31 @@
           ctx.fillStyle = "#fff";
           ctx.fillRect(PADDING, PADDING, BOARD_SIZE, BOARD_SIZE);
           ctx.globalAlpha = 1;
-        } else {
-          fx.flash = null;
-        }
+        } else fx.flash = null;
       }
     }
 
     function makePiece(r, c, type, special = null) {
       const { x, y } = xyFromCell(r, c);
-      return {
-        r,
-        c,
-        type,
-        special,
-        x,
-        y,
-        sx: x,
-        sy: y,
-        tx: x,
-        ty: y,
-        t0: 0,
-        t1: 0,
-        popping: false,
-        popT0: 0,
-        popT1: 0,
-        active: true,
-      };
+      return { r, c, type, special, x, y, sx: x, sy: y, tx: x, ty: y, t0: 0, t1: 0, popping: false, popT0: 0, popT1: 0, active: true };
     }
-
     function setPieceCell(p, r, c) {
-      p.r = r;
-      p.c = c;
+      p.r = r; p.c = c;
       const { x, y } = xyFromCell(r, c);
-      p.sx = p.x;
-      p.sy = p.y;
-      p.tx = x;
-      p.ty = y;
+      p.sx = p.x; p.sy = p.y;
+      p.tx = x; p.ty = y;
     }
-
-    function startMoveAnim(p, ms) {
-      p.t0 = now();
-      p.t1 = p.t0 + ms;
-      p.sx = p.x;
-      p.sy = p.y;
-    }
-
-    function startPop(p) {
-      p.popping = true;
-      p.popT0 = now();
-      p.popT1 = p.popT0 + CFG.popMs;
-    }
+    function startMoveAnim(p, ms) { p.t0 = now(); p.t1 = p.t0 + ms; p.sx = p.x; p.sy = p.y; }
+    function startPop(p) { p.popping = true; p.popT0 = now(); p.popT1 = p.popT0 + CFG.popMs; }
 
     function wouldMakeMatchAt(r, c, type) {
       const get = (rr, cc) => (inBounds(rr, cc) ? pieces[rr][cc]?.type ?? null : null);
-
-      const l1 = get(r, c - 1) === type,
-        l2 = get(r, c - 2) === type;
-      const r1 = get(r, c + 1) === type,
-        r2 = get(r, c + 2) === type;
+      const l1 = get(r, c - 1) === type, l2 = get(r, c - 2) === type;
+      const r1 = get(r, c + 1) === type, r2 = get(r, c + 2) === type;
       if ((l1 && l2) || (r1 && r2) || (l1 && r1)) return true;
-
-      const u1 = get(r - 1, c) === type,
-        u2 = get(r - 2, c) === type;
-      const d1 = get(r + 1, c) === type,
-        d2 = get(r + 2, c) === type;
+      const u1 = get(r - 1, c) === type, u2 = get(r - 2, c) === type;
+      const d1 = get(r + 1, c) === type, d2 = get(r + 2, c) === type;
       if ((u1 && u2) || (d1 && d2) || (u1 && d1)) return true;
-
       return false;
     }
 
@@ -282,13 +227,9 @@
       resetArrays();
       for (let r = 0; r < GRID; r++) {
         for (let c = 0; c < GRID; c++) {
-          let t,
-            guard = 0;
-          do {
-            t = randType();
-            guard++;
-            if (guard > 80) break;
-          } while (wouldMakeMatchAt(r, c, t));
+          let t, guard = 0;
+          do { t = randType(); guard++; if (guard > 80) break; }
+          while (wouldMakeMatchAt(r, c, t));
           pieces[r][c] = makePiece(r, c, t, null);
         }
       }
@@ -301,11 +242,7 @@
         const j = Math.floor(Math.random() * (i + 1));
         [cells[i], cells[j]] = [cells[j], cells[i]];
       }
-      const n = Math.min(count, cells.length);
-      for (let i = 0; i < n; i++) {
-        const { r, c } = cells[i];
-        ice[r][c] = 1;
-      }
+      for (let i = 0; i < Math.min(count, cells.length); i++) ice[cells[i].r][cells[i].c] = 1;
     }
 
     function updateHUD(msg = "") {
@@ -313,36 +250,32 @@
       ui.score.textContent = String(score);
       ui.best.textContent = String(best);
       ui.moves.textContent = String(movesLeft);
+      ui.status.textContent = msg;
 
       ui.objectives.innerHTML = "";
-
       const liScore = document.createElement("li");
       liScore.textContent = `Atteindre ${targetScore} points (${score}/${targetScore})`;
       ui.objectives.appendChild(liScore);
 
       for (const k of Object.keys(objectives.collect || {})) {
-        const needed = objectives.collect[k];
-        if (needed <= 0) continue;
+        const need = objectives.collect[k];
+        if (need <= 0) continue;
         const li = document.createElement("li");
-        li.textContent = `Collecter ${needed} ${COLOR_NAMES[Number(k)]}`;
+        li.textContent = `Collecter ${need} ${COLOR_NAMES[Number(k)]}`;
         ui.objectives.appendChild(li);
       }
 
       if (objectives.iceLeft > 0) {
-        const liIce = document.createElement("li");
-        liIce.textContent = `Casser la glace : ${objectives.iceLeft} restante(s)`;
-        ui.objectives.appendChild(liIce);
+        const li = document.createElement("li");
+        li.textContent = `Casser la glace : ${objectives.iceLeft} restante(s)`;
+        ui.objectives.appendChild(li);
       }
-
-      ui.status.textContent = msg;
     }
 
     function objectivesDone() {
       if (score < targetScore) return false;
       if (objectives.iceLeft > 0) return false;
-      for (const k of Object.keys(objectives.collect)) {
-        if (objectives.collect[k] > 0) return false;
-      }
+      for (const k of Object.keys(objectives.collect)) if (objectives.collect[k] > 0) return false;
       return true;
     }
 
@@ -350,30 +283,55 @@
       ui.winText.textContent = `Niveau ${levelIndex + 1} validé ✅`;
       ui.winModal.classList.remove("hidden");
     }
-    function hideWin() {
-      ui.winModal.classList.add("hidden");
+    function hideWin() { ui.winModal.classList.add("hidden"); }
+
+    // NEW: details game over
+    function buildMissingLines() {
+      const lines = [];
+
+      if (score < targetScore) lines.push(`🎯 Score manquant : ${targetScore - score}`);
+      for (const k of Object.keys(objectives.collect || {})) {
+        const need = objectives.collect[k];
+        if (need > 0) lines.push(`🧩 ${COLOR_NAMES[Number(k)]} à collecter : ${need}`);
+      }
+      if (objectives.iceLeft > 0) lines.push(`🧊 Glace restante : ${objectives.iceLeft}`);
+
+      return lines.length ? lines : ["Tout est validé (devrait être une victoire)."];
     }
 
-    // NEW: Game Over modal
     function showLose() {
-      ui.loseText.textContent = `Objectifs non atteints. Score ${score}/${targetScore}.`;
+      ui.loseText.textContent = `Tu n’as plus de coups.`;
+      ui.loseDetails.innerHTML = "";
+      for (const line of buildMissingLines()) {
+        const li = document.createElement("li");
+        li.textContent = line;
+        ui.loseDetails.appendChild(li);
+      }
       ui.loseModal.classList.remove("hidden");
     }
-    function hideLose() {
-      ui.loseModal.classList.add("hidden");
+    function hideLose() { ui.loseModal.classList.add("hidden"); }
+
+    function openLevels() {
+      ui.levelsGrid.innerHTML = "";
+      LEVELS.forEach((L, i) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = `Niv ${i + 1}`;
+        b.onclick = () => {
+          closeLevels();
+          applyLevel(i, true);
+        };
+        ui.levelsGrid.appendChild(b);
+      });
+      ui.levelsModal.classList.remove("hidden");
     }
+    function closeLevels() { ui.levelsModal.classList.add("hidden"); }
 
     function decIceIfAny(r, c) {
-      if (ice[r][c] === 1) {
-        ice[r][c] = 0;
-        objectives.iceLeft = Math.max(0, objectives.iceLeft - 1);
-      }
+      if (ice[r][c] === 1) { ice[r][c] = 0; objectives.iceLeft = Math.max(0, objectives.iceLeft - 1); }
     }
-
     function applyCollect(type, count) {
-      if (objectives.collect[type] != null) {
-        objectives.collect[type] = Math.max(0, objectives.collect[type] - count);
-      }
+      if (objectives.collect[type] != null) objectives.collect[type] = Math.max(0, objectives.collect[type] - count);
     }
 
     function swapPieces(a, b, animate = true) {
@@ -381,10 +339,8 @@
       const pb = pieces[b.r][b.c];
       pieces[a.r][a.c] = pb;
       pieces[b.r][b.c] = pa;
-
       if (pa) setPieceCell(pa, b.r, b.c);
       if (pb) setPieceCell(pb, a.r, a.c);
-
       if (animate) {
         if (pa) startMoveAnim(pa, CFG.swapMs);
         if (pb) startMoveAnim(pb, CFG.swapMs);
@@ -419,6 +375,7 @@
     function findMatchGroups() {
       const groups = [];
 
+      // horizontal
       for (let r = 0; r < GRID; r++) {
         let runType = pieces[r][0]?.type ?? null;
         let runStart = 0;
@@ -434,12 +391,12 @@
               groups.push({ cells, type: runType, axis: "h" });
             }
             runType = c < GRID ? pieces[r][c]?.type ?? null : null;
-            runStart = c;
-            runLen = 1;
+            runStart = c; runLen = 1;
           }
         }
       }
 
+      // vertical
       for (let c = 0; c < GRID; c++) {
         let runType = pieces[0][c]?.type ?? null;
         let runStart = 0;
@@ -455,12 +412,12 @@
               groups.push({ cells, type: runType, axis: "v" });
             }
             runType = r < GRID ? pieces[r][c]?.type ?? null : null;
-            runStart = r;
-            runLen = 1;
+            runStart = r; runLen = 1;
           }
         }
       }
 
+      // merge overlaps (T/L)
       let merged = true;
       while (merged) {
         merged = false;
@@ -490,6 +447,7 @@
         g.orientation = rows.size === 1 ? "h" : cols.size === 1 ? "v" : null;
       }
 
+      // dedupe
       const uniq = [];
       const seen = new Set();
       for (const g of groups) {
@@ -505,31 +463,23 @@
       const p = pieces[r][c];
       if (!p || !p.special) return;
 
-      if (p.special === "row") {
-        for (let cc = 0; cc < GRID; cc++) clearSet.add(keyOf(r, cc));
-      } else if (p.special === "col") {
-        for (let rr = 0; rr < GRID; rr++) clearSet.add(keyOf(rr, c));
-      } else if (p.special === "bomb") {
-        for (let rr = r - 1; rr <= r + 1; rr++) {
-          for (let cc = c - 1; cc <= c + 1; cc++) {
+      if (p.special === "row") for (let cc = 0; cc < GRID; cc++) clearSet.add(keyOf(r, cc));
+      else if (p.special === "col") for (let rr = 0; rr < GRID; rr++) clearSet.add(keyOf(rr, c));
+      else if (p.special === "bomb") {
+        for (let rr = r - 1; rr <= r + 1; rr++)
+          for (let cc = c - 1; cc <= c + 1; cc++)
             if (inBounds(rr, cc)) clearSet.add(keyOf(rr, cc));
-          }
-        }
       } else if (p.special === "color") {
         let targetType = null;
         if (lastSwap) {
-          const a = lastSwap.a,
-            b = lastSwap.b;
+          const a = lastSwap.a, b = lastSwap.b;
           const other = a.r === r && a.c === c ? pieces[b.r][b.c] : pieces[a.r][a.c];
           if (other) targetType = other.type;
         }
         if (targetType == null) targetType = randType();
-        for (let rr = 0; rr < GRID; rr++) {
-          for (let cc = 0; cc < GRID; cc++) {
-            const q = pieces[rr][cc];
-            if (q && q.type === targetType) clearSet.add(keyOf(rr, cc));
-          }
-        }
+        for (let rr = 0; rr < GRID; rr++)
+          for (let cc = 0; cc < GRID; cc++)
+            if (pieces[rr][cc] && pieces[rr][cc].type === targetType) clearSet.add(keyOf(rr, cc));
       }
     }
 
@@ -554,17 +504,9 @@
       if (!p) return null;
       p.special = bonus;
 
-      if (bonus === "row" || bonus === "col") {
-        addBurst(place.r, place.c, p.type, 1.25);
-        addShake(0.6);
-      } else if (bonus === "bomb") {
-        addBurst(place.r, place.c, p.type, 1.6);
-        addShake(0.8);
-      } else if (bonus === "color") {
-        addBurst(place.r, place.c, p.type, 2.4);
-        addFlash(1.2);
-        addShake(1.1);
-      }
+      if (bonus === "row" || bonus === "col") { addBurst(place.r, place.c, p.type, 1.25); addShake(0.6); }
+      else if (bonus === "bomb") { addBurst(place.r, place.c, p.type, 1.6); addShake(0.8); }
+      else if (bonus === "color") { addBurst(place.r, place.c, p.type, 2.4); addFlash(1.2); addShake(1.1); }
 
       return place;
     }
@@ -582,7 +524,6 @@
           if (score > best) best = score;
           save();
 
-          // NEW: show lose modal when out of moves and not done
           if (objectivesDone()) {
             state = "WIN";
             updateHUD("Objectifs remplis ✅");
@@ -591,9 +532,8 @@
             state = "LOSE";
             updateHUD("Plus de coups… 😬");
             showLose();
-          } else {
-            updateHUD("");
-          }
+          } else updateHUD("");
+
           return;
         }
 
@@ -622,18 +562,8 @@
             if (p && p.special) triggerSpecialAt(r, c, extra);
           }
           for (const k of extra) {
-            if (!clear.has(k) && !keep.has(k)) {
-              clear.add(k);
-              expanded = true;
-            }
+            if (!clear.has(k) && !keep.has(k)) { clear.add(k); expanded = true; }
           }
-        }
-
-        if (clear.size === 0) {
-          const fallMs = CFG.fallMs;
-          applyGravityAndRefill();
-          setTimeout(step, fallMs + CFG.chainGap);
-          return;
         }
 
         score += clear.size * 10 + Math.max(0, groups.length - 1) * 20;
@@ -693,66 +623,13 @@
 
         if (!immediateColor && !hasMatches) {
           swapPieces(from, to, true);
-          setTimeout(() => {
-            state = "IDLE";
-            input.locked = false;
-            lastSwap = null;
-          }, CFG.swapMs + 10);
+          setTimeout(() => { state = "IDLE"; input.locked = false; lastSwap = null; }, CFG.swapMs + 10);
           return;
         }
 
         movesLeft--;
         updateHUD("");
-
-        if (immediateColor) {
-          addFlash(1.1);
-          addShake(1.0);
-
-          const clear = new Set();
-          const extra = new Set();
-
-          let bombCell = null;
-          if (aNow?.special === "color") bombCell = { r: to.r, c: to.c };
-          if (bNow?.special === "color") bombCell = { r: from.r, c: from.c };
-
-          if (bombCell) {
-            clear.add(keyOf(bombCell.r, bombCell.c));
-            triggerSpecialAt(bombCell.r, bombCell.c, extra);
-          }
-          for (const k of extra) clear.add(k);
-
-          score += clear.size * 10 + 60;
-
-          const counts = new Map();
-          for (const k of clear) {
-            const [r, c] = k.split(",").map(Number);
-            const p = pieces[r][c];
-            if (p) counts.set(p.type, (counts.get(p.type) || 0) + 1);
-          }
-          for (const [t, cnt] of counts.entries()) applyCollect(String(t), cnt);
-
-          for (const k of clear) {
-            const [r, c] = k.split(",").map(Number);
-            decIceIfAny(r, c);
-          }
-
-          updateHUD("");
-
-          for (const k of clear) {
-            const [r, c] = k.split(",").map(Number);
-            const p = pieces[r][c];
-            if (p) startPop(p);
-            pieces[r][c] = null;
-          }
-
-          setTimeout(() => {
-            applyGravityAndRefill();
-            setTimeout(() => resolveChain(), CFG.fallMs + CFG.chainGap);
-          }, CFG.popMs + CFG.chainGap);
-
-          return;
-        }
-
+        if (immediateColor) { addFlash(1.1); addShake(1.0); }
         resolveChain();
       }, CFG.swapMs + 10);
     }
@@ -793,7 +670,6 @@
       else target.r += dy > 0 ? 1 : -1;
 
       const from = { r: input.start.r, c: input.start.c };
-
       input.down = false;
       input.start = null;
 
@@ -801,14 +677,10 @@
       tryMove(from, target);
     }
 
-    function onUp() {
-      input.down = false;
-      input.start = null;
-    }
+    function onUp() { input.down = false; input.start = null; }
 
     function draw() {
       const { dx, dy } = getShakeOffset();
-
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
       ctx.translate(dx, dy);
@@ -844,21 +716,14 @@
             const e = easeOut(t);
             p.x = p.sx + (p.tx - p.sx) * e;
             p.y = p.sy + (p.ty - p.sy) * e;
-            if (t >= 1) {
-              p.x = p.tx;
-              p.y = p.ty;
-              p.t0 = p.t1 = 0;
-            }
+            if (t >= 1) { p.x = p.tx; p.y = p.ty; p.t0 = p.t1 = 0; }
           }
 
           let scale = 1;
           if (p.popping) {
             const t = clamp((now() - p.popT0) / (p.popT1 - p.popT0), 0, 1);
             scale = 1 - easeOut(t);
-            if (t >= 1) {
-              p.active = false;
-              p.popping = false;
-            }
+            if (t >= 1) { p.active = false; p.popping = false; }
           }
 
           const radius = CELL * 0.33 * scale;
@@ -884,34 +749,6 @@
           ctx.arc(p.x - radius * 0.25, p.y - radius * 0.25, radius * 0.35, 0, Math.PI * 2);
           ctx.fill();
           ctx.globalAlpha = 1;
-
-          if (p.special) {
-            ctx.strokeStyle = "rgba(255,255,255,0.85)";
-            ctx.lineWidth = 3;
-
-            if (p.special === "row" || p.special === "col") {
-              ctx.beginPath();
-              if (p.special === "row") {
-                ctx.moveTo(p.x - radius, p.y);
-                ctx.lineTo(p.x + radius, p.y);
-              } else {
-                ctx.moveTo(p.x, p.y - radius);
-                ctx.lineTo(p.x, p.y + radius);
-              }
-              ctx.stroke();
-            } else if (p.special === "bomb") {
-              ctx.beginPath();
-              ctx.arc(p.x, p.y, radius * 0.55, 0, Math.PI * 2);
-              ctx.stroke();
-            } else if (p.special === "color") {
-              ctx.beginPath();
-              ctx.arc(p.x, p.y, radius * 0.65, 0, Math.PI * 2);
-              ctx.stroke();
-              ctx.beginPath();
-              ctx.arc(p.x, p.y, radius * 0.3, 0, Math.PI * 2);
-              ctx.stroke();
-            }
-          }
         }
       }
 
@@ -929,12 +766,7 @@
     function save() {
       try {
         const data = {
-          best,
-          levelIndex,
-          score,
-          movesLeft,
-          targetScore,
-          objectives,
+          best, levelIndex, score, movesLeft, targetScore, objectives,
           grid: pieces.map((row) => row.map((p) => (p ? { t: p.type, s: p.special } : null))),
           ice,
         };
@@ -943,18 +775,13 @@
     }
 
     function load() {
-      try {
-        return JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-      } catch {
-        return null;
-      }
+      try { return JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); }
+      catch { return null; }
     }
 
     function applyLevel(i, freshScore = true) {
-      hideWin();
-      hideLose(); // NEW
-
-      levelIndex = Math.max(0, Math.min(i, LEVELS.length - 1));
+      hideWin(); hideLose(); closeLevels();
+      levelIndex = clamp(i, 0, LEVELS.length - 1);
       const L = LEVELS[levelIndex];
 
       movesLeft = L.moves;
@@ -975,8 +802,7 @@
     }
 
     function nextLevel() {
-      hideWin();
-      hideLose();
+      hideWin(); hideLose();
       if (levelIndex < LEVELS.length - 1) applyLevel(levelIndex + 1, true);
       else {
         ui.winText.textContent = "Démo terminée ✅ Ajoute des niveaux dans LEVELS";
@@ -986,14 +812,10 @@
 
     function maybeResume() {
       const s = load();
-      if (!s || !s.grid) {
-        best = 0;
-        applyLevel(0, true);
-        return;
-      }
+      if (!s || !s.grid) { best = 0; applyLevel(0, true); return; }
 
       best = Number(s.best ?? 0);
-      levelIndex = Math.max(0, Math.min(Number(s.levelIndex ?? 0), LEVELS.length - 1));
+      levelIndex = clamp(Number(s.levelIndex ?? 0), 0, LEVELS.length - 1);
       score = Number(s.score ?? 0);
       movesLeft = Number(s.movesLeft ?? LEVELS[levelIndex].moves);
       targetScore = Number(s.targetScore ?? LEVELS[levelIndex].targetScore);
@@ -1014,31 +836,29 @@
       if (score > best) best = score;
       updateHUD("Reprise");
 
-      if (objectivesDone()) {
-        state = "WIN";
-        showWin();
-      } else if (movesLeft <= 0) {
-        state = "LOSE";
-        showLose();
-      }
+      if (objectivesDone()) { state = "WIN"; showWin(); }
+      else if (movesLeft <= 0) { state = "LOSE"; showLose(); }
     }
 
+    // events
     canvas.addEventListener("pointerdown", onDown, { passive: false });
     canvas.addEventListener("pointermove", onMove, { passive: false });
     canvas.addEventListener("pointerup", onUp, { passive: true });
     canvas.addEventListener("pointercancel", onUp, { passive: true });
 
     ui.newGame.addEventListener("click", () => applyLevel(levelIndex, true));
+    ui.openLevels.addEventListener("click", openLevels);
+
     ui.winRestart.addEventListener("click", () => applyLevel(levelIndex, true));
     ui.winNext.addEventListener("click", nextLevel);
+    ui.winLevels.addEventListener("click", () => { hideWin(); openLevels(); });
 
-    // NEW
     ui.loseRestart.addEventListener("click", () => applyLevel(levelIndex, true));
+    ui.loseLevels.addEventListener("click", () => { hideLose(); openLevels(); });
 
-    function tick() {
-      draw();
-      requestAnimationFrame(tick);
-    }
+    ui.levelsClose.addEventListener("click", closeLevels);
+
+    function tick() { draw(); requestAnimationFrame(tick); }
 
     maybeResume();
     tick();
