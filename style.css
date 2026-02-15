@@ -50,3 +50,13 @@ canvas {
   text-align: center;
   max-width: 48ch;
 }
+.panel{
+  width: min(92vw, 560px);
+  padding: 12px 12px;
+  border: 1px solid rgba(232,238,246,0.1);
+  border-radius: 14px;
+  background: rgba(232,238,246,0.04);
+}
+.panelTitle{ font-weight: 800; margin-bottom: 6px; }
+#objectives{ margin: 0; padding-left: 18px; }
+.status{ margin-top: 8px; opacity: 0.85; }
