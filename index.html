@@ -3,32 +3,50 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Match-3 V3</title>
+  <title>Match-3</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
   <header class="topbar">
-    <div class="title">Match-3</div>
+    <div class="brand">
+      <div class="brandTitle">Match-3</div>
+      <div class="brandSub">Niv <b id="level">1</b></div>
+    </div>
 
-    <div class="hud">
-      <span>Niv: <b id="level">1</b></span>
-      <span>Score: <b id="score">0</b></span>
-      <span>Best: <b id="best">0</b></span>
-      <span>Coups: <b id="moves">0</b></span>
+    <div class="hudCards">
+      <div class="card">
+        <div class="label">⭐ Best</div>
+        <div class="value" id="best">0</div>
+      </div>
+      <div class="card">
+        <div class="label">🎯 Score</div>
+        <div class="value" id="score">0</div>
+      </div>
+      <div class="card">
+        <div class="label">🪄 Coups</div>
+        <div class="value" id="moves">0</div>
+      </div>
+    </div>
 
+    <div class="actions">
       <button id="newGame" type="button">Recommencer</button>
       <button id="nextLevel" type="button">Niveau suivant</button>
     </div>
   </header>
 
-  <main class="wrap">
-    <canvas id="game" width="640" height="640" aria-label="Jeu match-3"></canvas>
+  <main class="layout">
+    <section class="boardWrap">
+      <canvas id="game" width="640" height="640" aria-label="Jeu match-3"></canvas>
+    </section>
 
-    <section class="panel" aria-label="Objectifs du niveau">
-      <div class="panelTitle">Objectifs</div>
-      <ul id="objectives"></ul>
-      <div id="status" class="status"></div>
+    <!-- Panneau collé en bas sur mobile -->
+    <section class="dock" aria-label="Objectifs du niveau">
+      <div class="dockHeader">
+        <div class="dockTitle">Objectifs</div>
+        <div id="status" class="status"></div>
+      </div>
+      <ul id="objectives" class="objectives"></ul>
     </section>
   </main>
 
