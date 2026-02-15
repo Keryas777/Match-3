@@ -5,14 +5,13 @@
   <meta name="viewport"
         content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Match-3</title>
-  <link rel="stylesheet" href="./style.css?v=1337" />
+  <link rel="stylesheet" href="./style.css?v=2000" />
 </head>
 
 <body>
-
   <header class="topbar">
     <div class="brand">
-      <div class="brandTitle">Match-3 — BUILD 1337</div>
+      <div class="brandTitle">Match-3</div>
       <div class="brandSub">Niv <b id="level">1</b></div>
     </div>
 
@@ -21,12 +20,10 @@
         <div class="label">⭐ Best</div>
         <div class="value" id="best">0</div>
       </div>
-
       <div class="card">
         <div class="label">🎯 Score</div>
         <div class="value" id="score">0</div>
       </div>
-
       <div class="card">
         <div class="label">🪄 Coups</div>
         <div class="value" id="moves">0</div>
@@ -40,42 +37,33 @@
 
   <main class="layout">
     <section class="boardWrap">
-      <canvas id="game" width="640" height="640"></canvas>
+      <canvas id="game" width="640" height="640" aria-label="Jeu match-3"></canvas>
     </section>
 
-    <section class="dock">
+    <section class="dock" aria-label="Objectifs du niveau">
       <div class="dockHeader">
         <div class="dockTitle">Objectifs</div>
-        <div id="status" class="status">⏳ En attente...</div>
+        <div id="status" class="status"></div>
       </div>
       <ul id="objectives" class="objectives"></ul>
     </section>
   </main>
 
-  <!-- Test JS inline -->
-  <script>
-    document.getElementById("status").textContent =
-      "✅ JS inline OK";
-  </script>
+  <!-- Modal victoire -->
+  <div id="winModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Victoire">
+    <div class="modalCard">
+      <div class="modalTitle">🎉 Niveau réussi !</div>
+      <div class="modalText" id="winText">Objectifs remplis ✅</div>
+      <div class="modalButtons">
+        <button id="winRestart" type="button">Recommencer</button>
+        <button id="winNext" type="button">Niveau suivant</button>
+      </div>
+    </div>
+  </div>
 
-  <!-- Chargement dynamique game.js avec vérification -->
-  <script>
-    const scr = document.createElement("script");
-    scr.src = "./game.js?v=1337";
+  <!-- Overlay d’erreur (si crash JS) -->
+  <div id="bootError" class="bootError hidden"></div>
 
-    scr.onload = () => {
-      document.getElementById("status").textContent =
-        "✅ game.js chargé";
-    };
-
-    scr.onerror = () => {
-      document.getElementById("status").textContent =
-        "❌ game.js introuvable ou non chargé";
-      alert("game.js ne se charge pas. Vérifie le nom exact + l'emplacement.");
-    };
-
-    document.body.appendChild(scr);
-  </script>
-
+  <script src="./game.js?v=2000"></script>
 </body>
 </html>
