@@ -14,17 +14,13 @@ body{
   background: #0b0f14;
   color: #e8eef6;
 
-  /* header + main qui remplit le reste */
   display: grid;
   grid-template-rows: auto 1fr;
 
-  /* pas de scroll global */
   overflow: hidden;
-
-  /* bloque le double-tap zoom, autorise taps */
   touch-action: manipulation;
 
-  /* ✅ Alternative CSS: élimine les micro "rubber band" iOS */
+  /* anti micro “rubber band” iOS */
   position: fixed;
   width: 100%;
 }
@@ -96,7 +92,7 @@ button{
 }
 button:active{ transform: translateY(1px); }
 
-/* ===== Main layout ===== */
+/* ===== Main ===== */
 .layout{
   height: 100%;
   min-height: 0;
@@ -109,17 +105,14 @@ button:active{ transform: translateY(1px); }
   overflow: hidden;
 }
 
-/* Board centered */
 .boardWrap{
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-
   touch-action: none;
 }
 
-/* Canvas */
 canvas{
   width: min(92vw, 60vh, 560px);
   height: min(92vw, 60vh, 560px);
@@ -131,7 +124,7 @@ canvas{
   touch-action: none;
 }
 
-/* ===== Dock bottom ===== */
+/* ===== Dock ===== */
 .dock{
   width: min(92vw, 560px);
   margin: 0 auto;
@@ -146,7 +139,6 @@ canvas{
   -webkit-overflow-scrolling: touch;
 
   touch-action: pan-y;
-
   position: relative;
 }
 
@@ -176,6 +168,46 @@ canvas{
   padding-left: 18px;
   display: grid;
   gap: 6px;
+}
+
+/* ===== Modal victoire ===== */
+.modal{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  z-index: 50;
+}
+.hidden{ display: none; }
+
+.modalCard{
+  width: min(92vw, 520px);
+  border-radius: 18px;
+  border: 1px solid rgba(232,238,246,0.16);
+  background: rgba(15, 23, 34, 0.92);
+  backdrop-filter: blur(8px);
+  padding: 16px 16px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+}
+
+.modalTitle{
+  font-weight: 950;
+  font-size: 22px;
+  margin-bottom: 6px;
+}
+
+.modalText{
+  opacity: 0.9;
+  margin-bottom: 12px;
+}
+
+.modalButtons{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 /* Mobile tweaks */
