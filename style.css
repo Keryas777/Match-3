@@ -4,6 +4,11 @@
 
 html, body { height: 100%; }
 
+/* --- Anti “rubber band” / overscroll --- */
+html, body{
+  overscroll-behavior: none;
+}
+
 body{
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -14,8 +19,11 @@ body{
   display: grid;
   grid-template-rows: auto 1fr;
 
-  /* PATCH: empêche le scroll global (le dock scrolle à l'intérieur) */
+  /* pas de scroll global */
   overflow: hidden;
+
+  /* bloque le double-tap zoom, autorise taps */
+  touch-action: manipulation;
 }
 
 /* ===== Top bar ===== */
@@ -88,15 +96,14 @@ button:active{ transform: translateY(1px); }
 /* ===== Main layout ===== */
 .layout{
   height: 100%;
-  min-height: 0;           /* crucial pour iOS */
+  min-height: 0;           /* crucial iOS */
   padding: 14px;
 
   display: grid;
   grid-template-rows: 1fr auto; /* board + dock */
   gap: 12px;
 
-  /* PATCH: le main ne doit pas déborder */
-  overflow: hidden;
+  overflow: hidden;        /* évite tout débordement */
 }
 
 /* Board centered */
@@ -105,9 +112,12 @@ button:active{ transform: translateY(1px); }
   display: flex;
   align-items: center;
   justify-content: center;
+
+  /* gestes capturés par le jeu */
+  touch-action: none;
 }
 
-/* Canvas : taille basée sur la place dispo */
+/* Canvas */
 canvas{
   width: min(92vw, 60vh, 560px);
   height: min(92vw, 60vh, 560px);
@@ -116,6 +126,7 @@ canvas{
   background: #0f1722;
   box-shadow: 0 10px 30px rgba(0,0,0,0.35);
 
+  /* empêche scroll/zoom sur la surface de jeu */
   touch-action: none;
 }
 
@@ -124,17 +135,20 @@ canvas{
   width: min(92vw, 560px);
   margin: 0 auto;
   padding: 12px 12px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom)); /* iPhone home bar */
+  padding-bottom: calc(12px + env(safe-area-inset-bottom)); /* home bar iPhone */
   border: 1px solid rgba(232,238,246,0.12);
   border-radius: 16px;
   background: rgba(232,238,246,0.05);
 
-  /* PATCH: le dock ne dépasse jamais l'écran */
-  max-height: 28vh;        /* ajuste: 24vh à 34vh */
+  /* ne dépasse pas l'écran */
+  max-height: 28vh;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 
-  /* BONUS: look "bottom sheet" */
+  /* autorise scroll vertical uniquement dans le dock */
+  touch-action: pan-y;
+
+  /* look bottom sheet */
   position: relative;
 }
 
@@ -173,7 +187,10 @@ canvas{
   .card{ min-width: 86px; }
   .card .value{ font-size: 17px; }
 
-  /* Un peu plus de place au jeu sur très petit écran */
+  /* + place au jeu */
   .dock{ max-height: 24vh; }
-  canvas{ width: min(92vw, 62vh, 560px); height: min(92vw, 62vh, 560px); }
+  canvas{
+    width: min(92vw, 62vh, 560px);
+    height: min(92vw, 62vh, 560px);
+  }
 }
