@@ -206,3 +206,24 @@ canvas{
   .dock{ max-height: 24vh; }
   canvas{ width: min(92vw, 62vh, 560px); height: min(92vw, 62vh, 560px); }
 }
+.modalList{
+  margin: 0 0 12px 0;
+  padding-left: 18px;
+  opacity: 0.92;
+  display: grid;
+  gap: 6px;
+}
+
+.levelsGrid{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 10px 0 12px 0;
+}
+.levelsGrid button{
+  padding: 10px 10px;
+  border-radius: 14px;
+}
+@media (max-width: 420px){
+  .levelsGrid{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+}
