@@ -1,6 +1,5 @@
 :root { color-scheme: dark; }
 * { box-sizing: border-box; }
-
 html, body { height: 100%; }
 html, body { overscroll-behavior: none; }
 
@@ -16,6 +15,7 @@ body{
   overflow: hidden;
   touch-action: manipulation;
 
+  /* anti micro “rubber band” iOS */
   position: fixed;
   width: 100%;
 }
@@ -37,7 +37,7 @@ body{
 }
 
 .brand{ display: grid; gap: 2px; }
-.brandTitle{ font-weight: 900; letter-spacing: 0.3px; }
+.brandTitle{ font-weight: 950; letter-spacing: 0.3px; }
 .brandSub{ opacity: 0.85; font-size: 13px; white-space: nowrap; }
 
 .hudCards{
@@ -59,13 +59,12 @@ body{
 .card .label{
   font-size: 12px;
   opacity: 0.8;
-  font-weight: 800;
+  font-weight: 850;
   white-space: nowrap;
 }
 .card .value{
   font-size: 18px;
   font-weight: 950;
-  letter-spacing: 0.2px;
 }
 
 .actions{
@@ -82,7 +81,7 @@ button{
   color: inherit;
   padding: 8px 10px;
   border-radius: 12px;
-  font-weight: 850;
+  font-weight: 900;
   white-space: nowrap;
 }
 button:active{ transform: translateY(1px); }
@@ -136,7 +135,6 @@ canvas{
   touch-action: pan-y;
   position: relative;
 }
-
 .dock::before{
   content: "";
   display: block;
@@ -146,7 +144,6 @@ canvas{
   margin: 2px auto 10px auto;
   background: rgba(232,238,246,0.18);
 }
-
 .dockHeader{
   display: flex;
   align-items: baseline;
@@ -154,9 +151,8 @@ canvas{
   gap: 10px;
   margin-bottom: 6px;
 }
-
 .dockTitle{ font-weight: 950; }
-.status{ opacity: 0.8; font-size: 13px; }
+.status{ opacity: 0.85; font-size: 13px; }
 .objectives{ margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 
 /* ===== Modal victoire ===== */
@@ -170,17 +166,18 @@ canvas{
   z-index: 50;
 }
 .hidden{ display: none; }
+
 .modalCard{
   width: min(92vw, 520px);
   border-radius: 18px;
   border: 1px solid rgba(232,238,246,0.16);
   background: rgba(15, 23, 34, 0.92);
   backdrop-filter: blur(8px);
-  padding: 16px 16px;
+  padding: 16px;
   box-shadow: 0 20px 50px rgba(0,0,0,0.45);
 }
 .modalTitle{ font-weight: 950; font-size: 22px; margin-bottom: 6px; }
-.modalText{ opacity: 0.9; margin-bottom: 12px; }
+.modalText{ opacity: 0.92; margin-bottom: 12px; }
 .modalButtons{ display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 
 /* ===== Boot error overlay ===== */
@@ -200,7 +197,7 @@ canvas{
   white-space: pre-wrap;
 }
 
-/* Mobile tweaks */
+/* Mobile */
 @media (max-width: 420px){
   .topbar{ grid-template-columns: 1fr; gap: 10px; }
   .actions{ justify-content: flex-start; }
