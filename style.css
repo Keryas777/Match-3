@@ -2,8 +2,8 @@ html, body{
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
-  overscroll-behavior: none;
+  overflow: hidden;              /* pas de scroll global */
+  overscroll-behavior: none;     /* anti “bounce” */
 }
 
 body{
@@ -27,7 +27,7 @@ button{
 button:active{ transform: translateY(1px); }
 button:disabled{ opacity: 0.45; cursor: not-allowed; }
 
-/* Layout */
+/* ---------- Layout ---------- */
 .topbar{
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -49,22 +49,15 @@ button:disabled{ opacity: 0.45; cursor: not-allowed; }
   min-width: 92px;
 }
 
-.card .label{
-  font-size: 12px;
-  opacity: 0.78;
-}
-
-.card .value{
-  font-size: 18px;
-  font-weight: 850;
-  margin-top: 2px;
-}
+.card .label{ font-size: 12px; opacity: 0.78; }
+.card .value{ font-size: 18px; font-weight: 850; margin-top: 2px; }
 
 .actions{
   display: flex;
   gap: 10px;
 }
 
+/* Hauteur dispo sous la topbar */
 .layout{
   height: calc(100dvh - 72px);
   display: grid;
@@ -83,6 +76,7 @@ button:disabled{ opacity: 0.45; cursor: not-allowed; }
   overflow: hidden;
 }
 
+/* Canvas responsive (pas de scroll, pas de pinch via touch-action) */
 canvas#game{
   width: min(68dvh, 92vw);
   height: min(68dvh, 92vw);
@@ -94,17 +88,25 @@ canvas#game{
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 18px;
   padding: 12px;
-  overflow: hidden;
+  overflow: hidden; /* pas de scroll dans le dock non plus */
+}
+
+.dock h2{
+  margin: 0 0 8px 0;
 }
 
 .objectives{
   margin: 0;
   padding-left: 18px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
-/* ✅ Mobile fix: objectifs plus haut + canvas un poil plus petit */
+.objectives li{
+  margin: 3px 0;
+}
+
+/* ✅ Mobile: objectifs plus haut, canvas un poil plus petit */
 @media (max-width: 980px){
   .topbar{
     grid-template-columns: 1fr;
@@ -112,35 +114,38 @@ canvas#game{
     align-items: start;
   }
 
-  .hudCards{
-    flex-wrap: wrap;
-  }
-
-  .actions{
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
+  .hudCards{ flex-wrap: wrap; }
+  .actions{ justify-content: flex-start; flex-wrap: wrap; }
 
   .layout{
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
+    grid-template-rows: 1fr auto;
     gap: 10px;
   }
 
+  /* On libère de la place en réduisant le canvas */
+  canvas#game{
+    width: min(54dvh, 96vw);
+    height: min(54dvh, 96vw);
+  }
+
+  /* Dock plus compact et plus haut */
   .dock{
-    display: block;
-    max-height: 18dvh;
-    overflow: auto;
     padding: 10px;
   }
 
-  canvas#game{
-    width: min(60dvh, 96vw);
-    height: min(60dvh, 96vw);
+  .objectives{
+    gap: 4px;
+  }
+
+  .objectives li{
+    margin: 2px 0;
+    font-size: 15px;
+    line-height: 1.15;
   }
 }
 
-/* Modals */
+/* ---------- Modals ---------- */
 .modal{
   position: fixed;
   inset: 0;
@@ -168,10 +173,7 @@ canvas#game{
   margin-bottom: 6px;
 }
 
-.modalText{
-  opacity: 0.86;
-  margin-bottom: 12px;
-}
+.modalText{ opacity: 0.86; margin-bottom: 12px; }
 
 .modalButtons{
   display: flex;
@@ -187,7 +189,7 @@ canvas#game{
   gap: 6px;
 }
 
-/* Boot error */
+/* ---------- Boot error ---------- */
 .bootError{
   position: fixed;
   inset: 0;
@@ -198,7 +200,7 @@ canvas#game{
   z-index: 999;
 }
 
-/* ===== Candy Crush-like Map + Stars ===== */
+/* ---------- Candy Crush-like map ---------- */
 .mapWrap{
   position: relative;
   height: 360px;
@@ -206,14 +208,6 @@ canvas#game{
   overflow: hidden;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.10);
-}
-
-.mapPath{
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
 }
 
 .mapNode{
@@ -230,37 +224,8 @@ canvas#game{
   gap: 2px;
 }
 
-.mapNode.current{
-  outline: 5px solid rgba(255,255,255,0.22);
-}
+.mapNode.current{ outline: 5px solid rgba(255,255,255,0.22); }
+.mapNode.locked{ opacity: 0.42; filter: grayscale(1); cursor: not-allowed; }
 
-.mapNode.locked{
-  opacity: 0.42;
-  filter: grayscale(1);
-  cursor: not-allowed;
-}
-
-.nodeLabel{
-  font-weight: 900;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.nodeStars{
-  font-size: 13px;
-  letter-spacing: 1px;
-  opacity: 0.95;
-}
-
-.nodeLock{
-  position: absolute;
-  bottom: 6px;
-  right: 8px;
-  font-size: 14px;
-  opacity: 0.95;
-}
-
-/* === Compact objectives spacing === */
-.dock h2{ margin: 0 0 8px 0; }
-.objectives{ gap: 6px; }
-.objectives li{ margin: 4px 0; }
+.nodeLabel{ font-weight: 900; font-size: 18px; line-height: 1; }
+.nodeStars{ font-size: 13px; letter-spacing: 1px; opacity: 0.95; }
