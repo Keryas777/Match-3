@@ -10,10 +10,11 @@
   };
 
   try {
-    // iOS: block pinch / double-tap zoom (si HTML/CSS le permettent déjà)
+    // iOS: blocage gestes zoom (si HTML/CSS le permettent déjà)
     document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
     document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
     document.addEventListener("gestureend", (e) => e.preventDefault(), { passive: false });
+
     let _lastTouchEnd = 0;
     document.addEventListener(
       "touchend",
@@ -27,6 +28,7 @@
 
     const canvas = document.getElementById("game");
     if (!canvas) throw new Error("Canvas #game introuvable");
+
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Impossible d'obtenir le contexte 2D");
 
@@ -37,7 +39,6 @@
       moves: document.getElementById("moves"),
       objectives: document.getElementById("objectives"),
       status: document.getElementById("status"),
-
       newGame: document.getElementById("newGame"),
       levelsBtn: document.getElementById("levelsBtn"),
 
@@ -57,7 +58,7 @@
       mapWrap: document.getElementById("mapWrap"),
     };
 
-    // sécurité : si un id manque, iOS peut juste "ne rien afficher"
+    // sécurité : si un id manque, iOS peut "ne rien afficher"
     const must = [
       "level",
       "score",
@@ -77,107 +78,116 @@
       "levelsClose",
       "mapWrap",
     ];
-    for (const k of must) {
-      if (!ui[k]) throw new Error(`Element manquant: #${k}`);
-    }
+    for (const k of must) if (!ui[k]) throw new Error(`Element manquant: #${k}`);
 
-    // ---------- CONFIG ----------
+    // ---------------- Canvas sizing (DPR + responsive) ----------------
     const GRID = 8;
     const TYPES = 6;
 
-    const PADDING = 18;
-    const BOARD_SIZE = canvas.width - PADDING * 2;
-    const CELL = BOARD_SIZE / GRID;
+    let DPR = 1;
+    let PADDING = 18;
+    let BOARD_SIZE = 0;
+    let CELL = 0;
 
-    // ✅ True Tone: on remplace le bleu ciel par du jaune
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      // si rect vaut 0 (rare au boot), on garde une taille safe
+      const cssSize = Math.max(280, Math.floor(Math.min(rect.width || 360, rect.height || 360)));
+      DPR = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+      canvas.width = Math.round(cssSize * DPR);
+      canvas.height = Math.round(cssSize * DPR);
+
+      PADDING = Math.round(18 * DPR);
+      BOARD_SIZE = canvas.width - PADDING * 2;
+      CELL = BOARD_SIZE / GRID;
+    }
+
+    window.addEventListener("resize", () => {
+      resizeCanvas();
+    });
+    resizeCanvas();
+
+    // ---------------- roundRect polyfill ----------------
+    function rrPath(x, y, w, h, r) {
+      const radius = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+      if (typeof ctx.roundRect === "function") {
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, radius);
+        return;
+      }
+      // fallback manuel
+      const x2 = x + w;
+      const y2 = y + h;
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.arcTo(x2, y, x2, y2, radius);
+      ctx.arcTo(x2, y2, x, y2, radius);
+      ctx.arcTo(x, y2, x, y, radius);
+      ctx.arcTo(x, y, x2, y, radius);
+      ctx.closePath();
+    }
+
+    // ---------------- CONFIG ----------------
+    // ✅ True Tone: bleu ciel remplacé par jaune
     const COLORS = ["#ef4444", "#f59e0b", "#22c55e", "#facc15", "#a855f7", "#14b8a6"];
     const COLOR_NAMES = ["Rouge", "Orange", "Vert", "Jaune", "Violet", "Turquoise"];
 
-    const CFG = {
-      swapMs: 140,
-      fallMs: 180,
-      popMs: 160,
-      chainGap: 60,
-
-      fxBurstMs: 450,
-      fxFlashMs: 160,
-      shakeMs: 220,
-
-      beamMs: 320,
-      crossMs: 420,
-    };
-
-    // ⚠️ Garde la même clé pour ne pas perdre ta progression
     const SAVE_KEY = "match3_v3_save";
 
-    // 30 niveaux (1–10 sans glace, 11–20 glace simple, 21–30 double épaisseur)
+    // 30 niveaux : 1–10 sans glace, 11–20 glace simple, 21–30 double épaisseur
     const LEVELS = [
-      // 1–10 : pas de glace (objectifs simples -> plus challenge)
-      { moves: 20, targetScore: 800,  collect: { 0: 10 },                          ice: 0,  iceStrength: 0 },
-      { moves: 22, targetScore: 1200, collect: { 2: 14, 5: 9 },                    ice: 0,  iceStrength: 0 },
-      { moves: 24, targetScore: 1800, collect: { 1: 16 },                          ice: 0,  iceStrength: 0 },
-      { moves: 24, targetScore: 2200, collect: { 3: 14, 4: 10 },                   ice: 0,  iceStrength: 0 },
-      { moves: 25, targetScore: 2600, collect: { 0: 12, 2: 12 },                   ice: 0,  iceStrength: 0 },
-      { moves: 25, targetScore: 3000, collect: { 5: 18 },                          ice: 0,  iceStrength: 0 },
-      { moves: 26, targetScore: 3500, collect: { 1: 14, 3: 14 },                   ice: 0,  iceStrength: 0 },
-      { moves: 26, targetScore: 4200, collect: { 2: 16, 4: 12 },                   ice: 0,  iceStrength: 0 },
-      { moves: 27, targetScore: 5000, collect: { 0: 14, 5: 14 },                   ice: 0,  iceStrength: 0 },
-      { moves: 28, targetScore: 6000, collect: { 1: 16, 2: 16, 3: 10 },             ice: 0,  iceStrength: 0 },
+      // 1–10 : sans glace (objectifs simples -> plus challenge)
+      { moves: 20, targetScore: 800, collect: { 0: 10 }, ice: 0, iceStrength: 0 },
+      { moves: 22, targetScore: 1200, collect: { 2: 14, 5: 9 }, ice: 0, iceStrength: 0 },
+      { moves: 24, targetScore: 1800, collect: { 1: 16 }, ice: 0, iceStrength: 0 },
+      { moves: 24, targetScore: 2200, collect: { 3: 14, 4: 10 }, ice: 0, iceStrength: 0 },
+      { moves: 25, targetScore: 2600, collect: { 0: 12, 2: 12 }, ice: 0, iceStrength: 0 },
+      { moves: 25, targetScore: 3000, collect: { 5: 18 }, ice: 0, iceStrength: 0 },
+      { moves: 26, targetScore: 3500, collect: { 1: 14, 3: 14 }, ice: 0, iceStrength: 0 },
+      { moves: 26, targetScore: 4200, collect: { 2: 16, 4: 12 }, ice: 0, iceStrength: 0 },
+      { moves: 27, targetScore: 5000, collect: { 0: 14, 5: 14 }, ice: 0, iceStrength: 0 },
+      { moves: 28, targetScore: 6000, collect: { 1: 16, 2: 16, 3: 10 }, ice: 0, iceStrength: 0 },
 
-      // 11–20 : glace simple (iceStrength = 1) + quantité croissante
-      { moves: 24, targetScore: 1600, collect: { 0: 10 },                          ice: 6,  iceStrength: 1 },
-      { moves: 24, targetScore: 2000, collect: { 2: 12 },                          ice: 8,  iceStrength: 1 },
-      { moves: 25, targetScore: 2400, collect: { 5: 12 },                          ice: 10, iceStrength: 1 },
-      { moves: 25, targetScore: 2900, collect: { 1: 12, 3: 10 },                   ice: 12, iceStrength: 1 },
-      { moves: 26, targetScore: 3400, collect: { 4: 12 },                          ice: 14, iceStrength: 1 },
-      { moves: 26, targetScore: 4000, collect: { 0: 10, 2: 10 },                   ice: 16, iceStrength: 1 },
-      { moves: 27, targetScore: 4600, collect: { 1: 12, 5: 10 },                   ice: 18, iceStrength: 1 },
-      { moves: 27, targetScore: 5200, collect: { 3: 14 },                          ice: 20, iceStrength: 1 },
-      { moves: 28, targetScore: 6000, collect: { 2: 14, 4: 10 },                   ice: 22, iceStrength: 1 },
-      { moves: 28, targetScore: 7000, collect: { 0: 12, 1: 12, 5: 8 },             ice: 24, iceStrength: 1 },
+      // 11–20 : glace simple
+      { moves: 24, targetScore: 1600, collect: { 0: 10 }, ice: 6, iceStrength: 1 },
+      { moves: 24, targetScore: 2000, collect: { 2: 12 }, ice: 8, iceStrength: 1 },
+      { moves: 25, targetScore: 2400, collect: { 5: 12 }, ice: 10, iceStrength: 1 },
+      { moves: 25, targetScore: 2900, collect: { 1: 12, 3: 10 }, ice: 12, iceStrength: 1 },
+      { moves: 26, targetScore: 3400, collect: { 4: 12 }, ice: 14, iceStrength: 1 },
+      { moves: 26, targetScore: 4000, collect: { 0: 10, 2: 10 }, ice: 16, iceStrength: 1 },
+      { moves: 27, targetScore: 4600, collect: { 1: 12, 5: 10 }, ice: 18, iceStrength: 1 },
+      { moves: 27, targetScore: 5200, collect: { 3: 14 }, ice: 20, iceStrength: 1 },
+      { moves: 28, targetScore: 6000, collect: { 2: 14, 4: 10 }, ice: 22, iceStrength: 1 },
+      { moves: 28, targetScore: 7000, collect: { 0: 12, 1: 12, 5: 8 }, ice: 24, iceStrength: 1 },
 
-      // 21–30 : double-glace (iceStrength = 2) + quantité croissante
-      { moves: 26, targetScore: 2400, collect: { 2: 10 },                          ice: 8,  iceStrength: 2 },
-      { moves: 26, targetScore: 3000, collect: { 0: 10 },                          ice: 10, iceStrength: 2 },
-      { moves: 27, targetScore: 3600, collect: { 5: 12 },                          ice: 12, iceStrength: 2 },
-      { moves: 27, targetScore: 4200, collect: { 3: 12, 4: 10 },                   ice: 14, iceStrength: 2 },
-      { moves: 28, targetScore: 5000, collect: { 1: 14 },                          ice: 16, iceStrength: 2 },
-      { moves: 28, targetScore: 5800, collect: { 0: 12, 2: 12 },                   ice: 18, iceStrength: 2 },
-      { moves: 29, targetScore: 6800, collect: { 4: 14 },                          ice: 20, iceStrength: 2 },
-      { moves: 29, targetScore: 8000, collect: { 1: 14, 5: 12 },                   ice: 24, iceStrength: 2 },
-      { moves: 30, targetScore: 9500, collect: { 2: 16, 3: 12 },                   ice: 28, iceStrength: 2 },
-      { moves: 30, targetScore: 11000, collect: { 0: 14, 1: 14, 4: 12 },           ice: 32, iceStrength: 2 },
+      // 21–30 : double glace
+      { moves: 26, targetScore: 2400, collect: { 2: 10 }, ice: 8, iceStrength: 2 },
+      { moves: 26, targetScore: 3000, collect: { 0: 10 }, ice: 10, iceStrength: 2 },
+      { moves: 27, targetScore: 3600, collect: { 5: 12 }, ice: 12, iceStrength: 2 },
+      { moves: 27, targetScore: 4200, collect: { 3: 12, 4: 10 }, ice: 14, iceStrength: 2 },
+      { moves: 28, targetScore: 5000, collect: { 1: 14 }, ice: 16, iceStrength: 2 },
+      { moves: 28, targetScore: 5800, collect: { 0: 12, 2: 12 }, ice: 18, iceStrength: 2 },
+      { moves: 29, targetScore: 6800, collect: { 4: 14 }, ice: 20, iceStrength: 2 },
+      { moves: 29, targetScore: 8000, collect: { 1: 14, 5: 12 }, ice: 24, iceStrength: 2 },
+      { moves: 30, targetScore: 9500, collect: { 2: 16, 3: 12 }, ice: 28, iceStrength: 2 },
+      { moves: 30, targetScore: 11000, collect: { 0: 14, 1: 14, 4: 12 }, ice: 32, iceStrength: 2 },
     ];
 
-    // ---------- STATE ----------
+    // ---------------- STATE ----------------
     let levelIndex = 0;
     let score = 0;
     let best = 0;
     let movesLeft = 0;
-
     let targetScore = 0;
     let objectives = { collect: {}, iceLeft: 0 };
-
     let unlockedMax = 1; // niveaux débloqués (1-indexé)
-    let starsByLevel = {}; // { levelNumber: 0..3 }
+    let starsByLevel = {}; // { "1":0..3 }
 
     const pieces = Array.from({ length: GRID }, () => Array(GRID).fill(0));
     const ice = Array.from({ length: GRID }, () => Array(GRID).fill(0)); // 0/1/2
-
     const input = { locked: false, down: null, over: null };
-    let lastSwap = null;
-    let state = "IDLE";
 
-    // FX
-    const fx = {
-      bursts: [], // {x,y,t,kind}
-      flashes: [], // {x,y,t,kind}
-      shakes: [], // {t,amp}
-      beams: [], // {x,y,t,dir}
-      crosses: [], // {x,y,t}
-    };
-
-    // ---------- SAVE/LOAD ----------
+    // ---------------- SAVE/LOAD ----------------
     function load() {
       try {
         const raw = localStorage.getItem(SAVE_KEY);
@@ -203,11 +213,14 @@
       } catch {}
     }
 
-    // ---------- HELPERS ----------
+    // ---------------- HELPERS ----------------
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
     function xyFromCell(r, c) {
-      return { x: PADDING + c * CELL + CELL / 2, y: PADDING + r * CELL + CELL / 2 };
+      return {
+        x: PADDING + c * CELL + CELL / 2,
+        y: PADDING + r * CELL + CELL / 2,
+      };
     }
 
     function cellFromXY(x, y) {
@@ -221,17 +234,13 @@
       return Math.floor(Math.random() * TYPES);
     }
 
-    function inBounds(r, c) {
-      return r >= 0 && r < GRID && c >= 0 && c < GRID;
-    }
-
     function sumIceLayers() {
       let left = 0;
       for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) left += ice[r][c];
       return left;
     }
 
-    // ---------- BOARD GEN ----------
+    // ---------------- BOARD GEN ----------------
     function hasMatchAt(r, c) {
       const t = pieces[r][c];
       // horizontal
@@ -239,7 +248,6 @@
       for (let cc = c - 1; cc >= 0 && pieces[r][cc] === t; cc--) cnt++;
       for (let cc = c + 1; cc < GRID && pieces[r][cc] === t; cc++) cnt++;
       if (cnt >= 3) return true;
-
       // vertical
       cnt = 1;
       for (let rr = r - 1; rr >= 0 && pieces[rr][c] === t; rr--) cnt++;
@@ -253,8 +261,6 @@
           ice[r][c] = 0;
           let t = randType();
           pieces[r][c] = t;
-
-          // re-roll to avoid immediate matches
           let guard = 0;
           while (hasMatchAt(r, c) && guard++ < 20) {
             t = randType();
@@ -267,16 +273,12 @@
     function placeIce(count, strength = 1) {
       const cells = [];
       for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) cells.push({ r, c });
-
       for (let i = cells.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [cells[i], cells[j]] = [cells[j], cells[i]];
       }
-
       const n = Math.min(count, cells.length);
-      for (let i = 0; i < n; i++) {
-        ice[cells[i].r][cells[i].c] = strength;
-      }
+      for (let i = 0; i < n; i++) ice[cells[i].r][cells[i].c] = strength;
     }
 
     function decIceIfAny(r, c) {
@@ -301,12 +303,12 @@
       return true;
     }
 
-    // ---------- MATCH FIND ----------
+    // ---------------- MATCH FIND ----------------
     function findRuns() {
       const marked = Array.from({ length: GRID }, () => Array(GRID).fill(false));
       let any = false;
 
-      // horizontal runs
+      // horizontal
       for (let r = 0; r < GRID; r++) {
         let start = 0;
         while (start < GRID) {
@@ -322,7 +324,7 @@
         }
       }
 
-      // vertical runs
+      // vertical
       for (let c = 0; c < GRID; c++) {
         let start = 0;
         while (start < GRID) {
@@ -348,40 +350,24 @@
       for (let r = 0; r < GRID; r++) {
         for (let c = 0; c < GRID; c++) {
           if (!marked[r][c]) continue;
-
           const t = pieces[r][c];
           perType[t] += 1;
           popped += 1;
-
-          // glace: on casse quand une pièce matchée se trouve dessus
           decIceIfAny(r, c);
-
-          // remove
           pieces[r][c] = -1;
         }
       }
 
-      // scoring simple + bonus par taille globale
       if (popped > 0) {
-        const base = popped * 30;
-        score += base;
+        score += popped * 30;
         best = Math.max(best, score);
-
-        // FX satisfaisante
-        const kind = popped >= 10 ? "HUGE" : popped >= 7 ? "BIG" : popped >= 4 ? "MED" : "SMALL";
-        fx.bursts.push({ x: canvas.width / 2, y: canvas.height / 2, t: performance.now(), kind });
-
-        // collect objectives
-        for (let t = 0; t < TYPES; t++) {
-          if (perType[t] > 0) applyCollect(t, perType[t]);
-        }
+        for (let t = 0; t < TYPES; t++) if (perType[t] > 0) applyCollect(t, perType[t]);
       }
 
       return popped;
     }
 
     function collapse() {
-      // gravity
       for (let c = 0; c < GRID; c++) {
         let write = GRID - 1;
         for (let r = GRID - 1; r >= 0; r--) {
@@ -391,9 +377,7 @@
             write--;
           }
         }
-        for (let r = write; r >= 0; r--) {
-          pieces[r][c] = randType();
-        }
+        for (let r = write; r >= 0; r--) pieces[r][c] = randType();
       }
     }
 
@@ -407,7 +391,7 @@
       }
     }
 
-    // ---------- SWAP ----------
+    // ---------------- SWAP ----------------
     function swapCells(a, b) {
       const t = pieces[a.r][a.c];
       pieces[a.r][a.c] = pieces[b.r][b.c];
@@ -431,13 +415,9 @@
       }
 
       movesLeft = Math.max(0, movesLeft - 1);
-
-      // resolve chain
       resolveAll();
-
       updateHUD("");
 
-      // end conditions
       if (objectivesDone()) {
         win();
         return true;
@@ -446,20 +426,17 @@
         lose();
         return true;
       }
-
       return true;
     }
 
-    // ---------- UI / MODALS ----------
+    // ---------------- UI ----------------
     function updateHUD(msg = "") {
       ui.level.textContent = `Niv ${levelIndex + 1}`;
       ui.score.textContent = String(score);
       ui.best.textContent = String(best);
       ui.moves.textContent = String(movesLeft);
 
-      // objectives list
       ui.objectives.innerHTML = "";
-
       const liScore = document.createElement("li");
       liScore.textContent = `Atteindre ${targetScore} points (${score}/${targetScore})`;
       ui.objectives.appendChild(liScore);
@@ -482,8 +459,6 @@
     }
 
     function starsForLevelPerformance() {
-      // ⭐⭐⭐: très bon / ⭐⭐: ok / ⭐: juste réussi
-      // critère simple : % coups restants
       const L = LEVELS[levelIndex];
       const ratio = movesLeft / Math.max(1, L.moves);
       if (ratio >= 0.45) return 3;
@@ -493,13 +468,11 @@
 
     function win() {
       input.locked = true;
-
       const s = starsForLevelPerformance();
-      starsByLevel[String(levelIndex + 1)] = Math.max(Number(starsByLevel[String(levelIndex + 1)] || 0), s);
-
-      unlockedMax = Math.max(unlockedMax, levelIndex + 2); // débloque le suivant
+      const key = String(levelIndex + 1);
+      starsByLevel[key] = Math.max(Number(starsByLevel[key] || 0), s);
+      unlockedMax = Math.max(unlockedMax, levelIndex + 2);
       save();
-
       ui.winText.textContent = `Objectifs remplis ✅\n⭐ ${s} étoile(s)`;
       ui.winModal.classList.remove("hidden");
     }
@@ -513,6 +486,7 @@
     function hideWin() {
       ui.winModal.classList.add("hidden");
     }
+
     function hideLose() {
       ui.loseModal.classList.add("hidden");
     }
@@ -521,31 +495,22 @@
       renderMap();
       ui.levelsModal.classList.remove("hidden");
     }
+
     function closeLevels() {
       ui.levelsModal.classList.add("hidden");
     }
 
     function renderMap() {
-      // Candy Crush-like simple path
       ui.mapWrap.innerHTML = "";
-
       const wrap = document.createElement("div");
       wrap.className = "mapWrap";
 
-      // svg path
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("class", "mapPath");
-      svg.setAttribute("viewBox", "0 0 100 100");
-      svg.innerHTML =
-        `<path d="M10 90 C 30 70, 30 30, 50 50 S 80 70, 90 10" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="2.2" stroke-linecap="round"/>`;
-      wrap.appendChild(svg);
-
       const total = LEVELS.length;
+
       for (let i = 1; i <= total; i++) {
         const t = (i - 1) / (total - 1);
-        // positions le long d'une courbe "S"
-        const x = 10 + 80 * t + (Math.sin(t * Math.PI * 2) * 6);
-        const y = 90 - 80 * t + (Math.sin(t * Math.PI * 3) * 4);
+        const x = 10 + 80 * t + Math.sin(t * Math.PI * 2) * 6;
+        const y = 90 - 80 * t + Math.sin(t * Math.PI * 3) * 4;
 
         const node = document.createElement("button");
         node.type = "button";
@@ -570,13 +535,6 @@
         node.appendChild(label);
         node.appendChild(stars);
 
-        if (locked) {
-          const lock = document.createElement("div");
-          lock.className = "nodeLock";
-          lock.textContent = "🔒";
-          node.appendChild(lock);
-        }
-
         node.addEventListener("click", () => {
           if (locked) return;
           applyLevel(i - 1, true);
@@ -589,22 +547,20 @@
       ui.mapWrap.appendChild(wrap);
     }
 
-    // ---------- DRAW ----------
+    // ---------------- DRAW ----------------
     function drawIceOverlay(x, y, strength) {
-      // plus visible + différencie 1 couche / 2 couches
       ctx.save();
       ctx.translate(x, y);
-      ctx.globalAlpha = strength === 2 ? 0.55 : 0.35;
 
+      const alphaFill = strength === 2 ? 0.55 : 0.35;
+      ctx.globalAlpha = alphaFill;
       ctx.fillStyle = "#cfe8ff";
-      ctx.beginPath();
-      ctx.roundRect(-CELL * 0.48, -CELL * 0.48, CELL * 0.96, CELL * 0.96, 10);
+      rrPath(-CELL * 0.48, -CELL * 0.48, CELL * 0.96, CELL * 0.96, 10 * DPR);
       ctx.fill();
 
-      // fissures / traits
       ctx.globalAlpha = strength === 2 ? 0.65 : 0.45;
       ctx.strokeStyle = "rgba(255,255,255,0.55)";
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 * DPR;
 
       ctx.beginPath();
       ctx.moveTo(-CELL * 0.32, -CELL * 0.12);
@@ -618,7 +574,7 @@
 
       if (strength === 2) {
         ctx.strokeStyle = "rgba(255,255,255,0.75)";
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 2.5 * DPR;
         ctx.beginPath();
         ctx.moveTo(-CELL * 0.36, CELL * 0.26);
         ctx.lineTo(CELL * 0.34, -CELL * 0.22);
@@ -626,19 +582,18 @@
       }
 
       ctx.restore();
+      ctx.globalAlpha = 1;
     }
 
     function drawPiece(x, y, type) {
       ctx.save();
       ctx.translate(x, y);
 
-      // piece
       ctx.fillStyle = COLORS[type];
       ctx.beginPath();
       ctx.arc(0, 0, CELL * 0.33, 0, Math.PI * 2);
       ctx.fill();
 
-      // highlight
       ctx.globalAlpha = 0.22;
       ctx.fillStyle = "#fff";
       ctx.beginPath();
@@ -646,23 +601,24 @@
       ctx.fill();
 
       ctx.restore();
+      ctx.globalAlpha = 1;
     }
 
     function drawGrid() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // board bg
       ctx.fillStyle = "#0f1722";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.fillStyle = "#0b1220";
       ctx.fillRect(PADDING, PADDING, BOARD_SIZE, BOARD_SIZE);
 
-      // cell lines
       ctx.strokeStyle = "rgba(255,255,255,0.06)";
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1 * DPR;
+
       for (let i = 0; i <= GRID; i++) {
         const v = PADDING + i * CELL;
+
         ctx.beginPath();
         ctx.moveTo(PADDING, v);
         ctx.lineTo(PADDING + BOARD_SIZE, v);
@@ -674,7 +630,6 @@
         ctx.stroke();
       }
 
-      // pieces + ice
       for (let r = 0; r < GRID; r++) {
         for (let c = 0; c < GRID; c++) {
           const { x, y } = xyFromCell(r, c);
@@ -684,46 +639,45 @@
         }
       }
 
-      // selection hover
       if (input.over) {
         const { x, y } = xyFromCell(input.over.r, input.over.c);
         ctx.save();
         ctx.translate(x, y);
         ctx.strokeStyle = "rgba(255,255,255,0.28)";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 * DPR;
         ctx.strokeRect(-CELL * 0.48, -CELL * 0.48, CELL * 0.96, CELL * 0.96);
         ctx.restore();
       }
     }
 
-    // ---------- INPUT ----------
-    function onPointerMove(ev) {
-      if (input.locked) return;
+    // ---------------- INPUT ----------------
+    function toCanvasXY(ev) {
       const rect = canvas.getBoundingClientRect();
+      // coords CSS -> coords canvas (DPR)
       const x = ((ev.clientX - rect.left) / rect.width) * canvas.width;
       const y = ((ev.clientY - rect.top) / rect.height) * canvas.height;
+      return { x, y };
+    }
+
+    function onPointerMove(ev) {
+      if (input.locked) return;
+      const { x, y } = toCanvasXY(ev);
       input.over = cellFromXY(x, y);
     }
 
     function onPointerDown(ev) {
       if (input.locked) return;
       ev.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const x = ((ev.clientX - rect.left) / rect.width) * canvas.width;
-      const y = ((ev.clientY - rect.top) / rect.height) * canvas.height;
+      const { x, y } = toCanvasXY(ev);
       input.down = cellFromXY(x, y);
     }
 
     function onPointerUp(ev) {
       if (input.locked) return;
       ev.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const x = ((ev.clientX - rect.left) / rect.width) * canvas.width;
-      const y = ((ev.clientY - rect.top) / rect.height) * canvas.height;
+      const { x, y } = toCanvasXY(ev);
       const up = cellFromXY(x, y);
-      if (input.down && up) {
-        trySwap(input.down, up);
-      }
+      if (input.down && up) trySwap(input.down, up);
       input.down = null;
     }
 
@@ -732,19 +686,16 @@
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", () => (input.down = null));
 
-    // ---------- LEVEL FLOW ----------
+    // ---------------- LEVEL FLOW ----------------
     function applyLevel(i, freshScore = true) {
       hideWin();
       hideLose();
       closeLevels();
 
       levelIndex = clamp(i, 0, LEVELS.length - 1);
-
-      // sécurité : ne pas lancer un niveau non débloqué
       if (levelIndex + 1 > unlockedMax) levelIndex = unlockedMax - 1;
 
       const L = LEVELS[levelIndex];
-
       movesLeft = L.moves;
       targetScore = L.targetScore;
       if (freshScore) score = 0;
@@ -752,16 +703,12 @@
       objectives = { collect: { ...(L.collect || {}) }, iceLeft: 0 };
 
       buildNewBoardNoMatches();
-
       if (Number(L.ice || 0) > 0 && Number(L.iceStrength || 0) > 0) {
         placeIce(Number(L.ice || 0), Number(L.iceStrength || 1));
       }
       objectives.iceLeft = sumIceLayers();
 
-      state = "IDLE";
       input.locked = false;
-      lastSwap = null;
-
       updateHUD(`Niveau ${levelIndex + 1}`);
       save();
     }
@@ -776,7 +723,7 @@
       }
     }
 
-    // ---------- BUTTONS ----------
+    // ---------------- BUTTONS ----------------
     ui.newGame.addEventListener("click", () => applyLevel(levelIndex, true));
     ui.levelsBtn.addEventListener("click", openLevels);
 
@@ -801,13 +748,13 @@
 
     ui.levelsClose.addEventListener("click", closeLevels);
 
-    // ---------- LOOP ----------
+    // ---------------- LOOP ----------------
     function tick() {
       drawGrid();
       requestAnimationFrame(tick);
     }
 
-    // ---------- START ----------
+    // ---------------- START ----------------
     load();
     updateHUD("✅ game.js chargé");
     applyLevel(levelIndex, true);
