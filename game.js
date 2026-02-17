@@ -1,11 +1,15 @@
 (() => {
+  // ---------------- BOOT ERROR (plus explicite) ----------------
   const bootError = (err) => {
     const el = document.getElementById("bootError");
     if (!el) return;
     el.classList.remove("hidden");
+    const msg = (err && (err.message || err.toString())) || "Erreur inconnue";
+    const stack = (err && err.stack) ? String(err.stack) : "";
     el.textContent =
       "Le jeu a crash.\n\n" +
-      String(err?.stack || err) +
+      msg +
+      (stack ? "\n\n" + stack : "") +
       "\n\nVérifie que game.js est bien au même endroit que index.html (root) et que le nom est EXACTEMENT 'game.js'.";
   };
 
@@ -14,7 +18,6 @@
     document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
     document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
     document.addEventListener("gestureend", (e) => e.preventDefault(), { passive: false });
-
     let _lastTouchEnd = 0;
     document.addEventListener(
       "touchend",
@@ -26,64 +29,65 @@
       { passive: false }
     );
 
-    const canvas = document.getElementById("game");
-    if (!canvas) throw new Error("Canvas #game introuvable");
+    // ---------------- DOM HELPERS (tolérants) ----------------
+    const $ = (id) => document.getElementById(id);
+    const pick = (...ids) => {
+      for (const id of ids) {
+        const el = $(id);
+        if (el) return el;
+      }
+      return null;
+    };
 
+    const canvas = pick("game", "board", "canvas", "match3");
+    if (!canvas) throw new Error("Canvas introuvable (id attendu: #game)");
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Impossible d'obtenir le contexte 2D");
 
+    // UI: ids principaux + alias (compat anciennes versions)
     const ui = {
-      level: document.getElementById("level"),
-      score: document.getElementById("score"),
-      best: document.getElementById("best"),
-      moves: document.getElementById("moves"),
-      objectives: document.getElementById("objectives"),
-      status: document.getElementById("status"),
-      newGame: document.getElementById("newGame"),
-      levelsBtn: document.getElementById("levelsBtn"),
+      level: pick("level", "lvl", "niveau"),
+      score: pick("score"),
+      best: pick("best", "highscore", "record"),
+      moves: pick("moves", "coups"),
+      objectives: pick("objectives", "goals", "objectifList"),
+      status: pick("status", "toast", "debug"),
+      newGame: pick("newGame", "restartBtn", "restart", "recommencer"),
 
-      winModal: document.getElementById("winModal"),
-      winText: document.getElementById("winText"),
-      winRestart: document.getElementById("winRestart"),
-      winNext: document.getElementById("winNext"),
-      winMenu: document.getElementById("winMenu"),
+      // “Niveaux”
+      levelsBtn: pick("levelsBtn", "levels", "levelsButton", "menuLevels"),
 
-      loseModal: document.getElementById("loseModal"),
-      loseText: document.getElementById("loseText"),
-      loseRestart: document.getElementById("loseRestart"),
-      loseMenu: document.getElementById("loseMenu"),
+      // Win modal
+      winModal: pick("winModal", "victoryModal", "win"),
+      winText: pick("winText", "victoryText"),
+      winRestart: pick("winRestart", "winRetry", "winReplay"),
+      winNext: pick("winNext", "nextLevel", "btnNext"),
+      winMenu: pick("winMenu", "winLevels", "btnWinLevels"),
 
-      levelsModal: document.getElementById("levelsModal"),
-      levelsClose: document.getElementById("levelsClose"),
-      mapWrap: document.getElementById("mapWrap"),
+      // Lose modal
+      loseModal: pick("loseModal", "gameOverModal", "lose"),
+      loseText: pick("loseText", "gameOverText"),
+      loseRestart: pick("loseRestart", "loseRetry", "loseReplay"),
+      loseMenu: pick("loseMenu", "loseLevels", "btnLoseLevels"),
+
+      // Levels modal (map)
+      levelsModal: pick("levelsModal", "mapModal", "levelSelectModal"),
+      levelsClose: pick("levelsClose", "closeLevels", "mapClose"),
+      mapWrap: pick("mapWrap", "mapContainer", "levelsMap"),
     };
 
-    // sécurité : si un id manque, iOS peut "ne rien afficher"
-    const must = [
-      "level",
-      "score",
-      "best",
-      "moves",
-      "objectives",
-      "newGame",
-      "levelsBtn",
-      "winModal",
-      "winRestart",
-      "winNext",
-      "winMenu",
-      "loseModal",
-      "loseRestart",
-      "loseMenu",
-      "levelsModal",
-      "levelsClose",
-      "mapWrap",
-    ];
-    for (const k of must) if (!ui[k]) throw new Error(`Element manquant: #${k}`);
+    // Obligatoires (stricts) : ceux sans lesquels on ne peut pas jouer
+    const MUST = ["level", "score", "best", "moves", "objectives", "newGame"];
+    for (const k of MUST) if (!ui[k]) throw new Error(`Element manquant: #${k} (ou alias non trouvé)`);
+
+    // Optionnels : si absents, on désactive juste la feature
+    const HAS_LEVELS_UI = !!(ui.levelsBtn && ui.levelsModal && ui.levelsClose && ui.mapWrap);
+    const HAS_WIN_UI = !!(ui.winModal && ui.winText && ui.winRestart && ui.winNext);
+    const HAS_LOSE_UI = !!(ui.loseModal && ui.loseText && ui.loseRestart);
 
     // ---------------- Canvas sizing (DPR + responsive) ----------------
     const GRID = 8;
     const TYPES = 6;
-
     let DPR = 1;
     let PADDING = 18;
     let BOARD_SIZE = 0;
@@ -91,20 +95,15 @@
 
     function resizeCanvas() {
       const rect = canvas.getBoundingClientRect();
-      // si rect vaut 0 (rare au boot), on garde une taille safe
       const cssSize = Math.max(280, Math.floor(Math.min(rect.width || 360, rect.height || 360)));
       DPR = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
       canvas.width = Math.round(cssSize * DPR);
       canvas.height = Math.round(cssSize * DPR);
-
       PADDING = Math.round(18 * DPR);
       BOARD_SIZE = canvas.width - PADDING * 2;
       CELL = BOARD_SIZE / GRID;
     }
-
-    window.addEventListener("resize", () => {
-      resizeCanvas();
-    });
+    window.addEventListener("resize", () => resizeCanvas());
     resizeCanvas();
 
     // ---------------- roundRect polyfill ----------------
@@ -115,7 +114,6 @@
         ctx.roundRect(x, y, w, h, radius);
         return;
       }
-      // fallback manuel
       const x2 = x + w;
       const y2 = y + h;
       ctx.beginPath();
@@ -128,7 +126,7 @@
     }
 
     // ---------------- CONFIG ----------------
-    // ✅ True Tone: bleu ciel remplacé par jaune
+    // True Tone: bleu ciel remplacé par jaune
     const COLORS = ["#ef4444", "#f59e0b", "#22c55e", "#facc15", "#a855f7", "#14b8a6"];
     const COLOR_NAMES = ["Rouge", "Orange", "Vert", "Jaune", "Violet", "Turquoise"];
 
@@ -136,7 +134,7 @@
 
     // 30 niveaux : 1–10 sans glace, 11–20 glace simple, 21–30 double épaisseur
     const LEVELS = [
-      // 1–10 : sans glace (objectifs simples -> plus challenge)
+      // 1–10 : sans glace
       { moves: 20, targetScore: 800, collect: { 0: 10 }, ice: 0, iceStrength: 0 },
       { moves: 22, targetScore: 1200, collect: { 2: 14, 5: 9 }, ice: 0, iceStrength: 0 },
       { moves: 24, targetScore: 1800, collect: { 1: 16 }, ice: 0, iceStrength: 0 },
@@ -180,11 +178,13 @@
     let movesLeft = 0;
     let targetScore = 0;
     let objectives = { collect: {}, iceLeft: 0 };
+
     let unlockedMax = 1; // niveaux débloqués (1-indexé)
     let starsByLevel = {}; // { "1":0..3 }
 
     const pieces = Array.from({ length: GRID }, () => Array(GRID).fill(0));
     const ice = Array.from({ length: GRID }, () => Array(GRID).fill(0)); // 0/1/2
+
     const input = { locked: false, down: null, over: null };
 
     // ---------------- SAVE/LOAD ----------------
@@ -199,17 +199,9 @@
         starsByLevel = data.starsByLevel || {};
       } catch {}
     }
-
     function save() {
       try {
-        localStorage.setItem(
-          SAVE_KEY,
-          JSON.stringify({
-            best,
-            unlockedMax,
-            starsByLevel,
-          })
-        );
+        localStorage.setItem(SAVE_KEY, JSON.stringify({ best, unlockedMax, starsByLevel }));
       } catch {}
     }
 
@@ -217,23 +209,17 @@
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
     function xyFromCell(r, c) {
-      return {
-        x: PADDING + c * CELL + CELL / 2,
-        y: PADDING + r * CELL + CELL / 2,
-      };
+      return { x: PADDING + c * CELL + CELL / 2, y: PADDING + r * CELL + CELL / 2 };
     }
-
     function cellFromXY(x, y) {
       const cx = Math.floor((x - PADDING) / CELL);
       const cy = Math.floor((y - PADDING) / CELL);
       if (cx < 0 || cx >= GRID || cy < 0 || cy >= GRID) return null;
       return { r: cy, c: cx };
     }
-
     function randType() {
       return Math.floor(Math.random() * TYPES);
     }
-
     function sumIceLayers() {
       let left = 0;
       for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) left += ice[r][c];
@@ -243,12 +229,12 @@
     // ---------------- BOARD GEN ----------------
     function hasMatchAt(r, c) {
       const t = pieces[r][c];
-      // horizontal
+
       let cnt = 1;
       for (let cc = c - 1; cc >= 0 && pieces[r][cc] === t; cc--) cnt++;
       for (let cc = c + 1; cc < GRID && pieces[r][cc] === t; cc++) cnt++;
       if (cnt >= 3) return true;
-      // vertical
+
       cnt = 1;
       for (let rr = r - 1; rr >= 0 && pieces[rr][c] === t; rr--) cnt++;
       for (let rr = r + 1; rr < GRID && pieces[rr][c] === t; rr++) cnt++;
@@ -308,7 +294,6 @@
       const marked = Array.from({ length: GRID }, () => Array(GRID).fill(false));
       let any = false;
 
-      // horizontal
       for (let r = 0; r < GRID; r++) {
         let start = 0;
         while (start < GRID) {
@@ -324,7 +309,6 @@
         }
       }
 
-      // vertical
       for (let c = 0; c < GRID; c++) {
         let start = 0;
         while (start < GRID) {
@@ -346,7 +330,6 @@
     function popMarked(marked) {
       let popped = 0;
       const perType = new Array(TYPES).fill(0);
-
       for (let r = 0; r < GRID; r++) {
         for (let c = 0; c < GRID; c++) {
           if (!marked[r][c]) continue;
@@ -357,13 +340,11 @@
           pieces[r][c] = -1;
         }
       }
-
       if (popped > 0) {
         score += popped * 30;
         best = Math.max(best, score);
         for (let t = 0; t < TYPES; t++) if (perType[t] > 0) applyCollect(t, perType[t]);
       }
-
       return popped;
     }
 
@@ -406,7 +387,6 @@
 
     function trySwap(a, b) {
       if (!adjacent(a, b)) return false;
-
       swapCells(a, b);
       const { any } = findRuns();
       if (!any) {
@@ -462,7 +442,7 @@
       const L = LEVELS[levelIndex];
       const ratio = movesLeft / Math.max(1, L.moves);
       if (ratio >= 0.45) return 3;
-      if (ratio >= 0.20) return 2;
+      if (ratio >= 0.2) return 2;
       return 1;
     }
 
@@ -473,38 +453,38 @@
       starsByLevel[key] = Math.max(Number(starsByLevel[key] || 0), s);
       unlockedMax = Math.max(unlockedMax, levelIndex + 2);
       save();
-      ui.winText.textContent = `Objectifs remplis ✅\n⭐ ${s} étoile(s)`;
-      ui.winModal.classList.remove("hidden");
+
+      if (HAS_WIN_UI) {
+        ui.winText.textContent = `Objectifs remplis ✅\n⭐ ${s} étoile(s)`;
+        ui.winModal.classList.remove("hidden");
+      } else {
+        updateHUD(`✅ Niveau réussi ! ⭐${s}`);
+      }
     }
 
     function lose() {
       input.locked = true;
-      ui.loseText.textContent = "Objectifs non atteints…";
-      ui.loseModal.classList.remove("hidden");
+      if (HAS_LOSE_UI) {
+        ui.loseText.textContent = "Objectifs non atteints…";
+        ui.loseModal.classList.remove("hidden");
+      } else {
+        updateHUD("❌ Game Over");
+      }
     }
 
     function hideWin() {
-      ui.winModal.classList.add("hidden");
+      if (ui.winModal) ui.winModal.classList.add("hidden");
     }
-
     function hideLose() {
-      ui.loseModal.classList.add("hidden");
+      if (ui.loseModal) ui.loseModal.classList.add("hidden");
     }
 
-    function openLevels() {
-      renderMap();
-      ui.levelsModal.classList.remove("hidden");
-    }
-
-    function closeLevels() {
-      ui.levelsModal.classList.add("hidden");
-    }
-
+    // Map niveaux (si UI présente)
     function renderMap() {
+      if (!HAS_LEVELS_UI) return;
       ui.mapWrap.innerHTML = "";
       const wrap = document.createElement("div");
       wrap.className = "mapWrap";
-
       const total = LEVELS.length;
 
       for (let i = 1; i <= total; i++) {
@@ -538,7 +518,7 @@
         node.addEventListener("click", () => {
           if (locked) return;
           applyLevel(i - 1, true);
-          closeLevels();
+          ui.levelsModal.classList.add("hidden");
         });
 
         wrap.appendChild(node);
@@ -552,14 +532,14 @@
       ctx.save();
       ctx.translate(x, y);
 
-      const alphaFill = strength === 2 ? 0.55 : 0.35;
+      const alphaFill = strength === 2 ? 0.6 : 0.38;
       ctx.globalAlpha = alphaFill;
       ctx.fillStyle = "#cfe8ff";
       rrPath(-CELL * 0.48, -CELL * 0.48, CELL * 0.96, CELL * 0.96, 10 * DPR);
       ctx.fill();
 
-      ctx.globalAlpha = strength === 2 ? 0.65 : 0.45;
-      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.globalAlpha = strength === 2 ? 0.72 : 0.5;
+      ctx.strokeStyle = "rgba(255,255,255,0.60)";
       ctx.lineWidth = 2 * DPR;
 
       ctx.beginPath();
@@ -573,8 +553,8 @@
       ctx.stroke();
 
       if (strength === 2) {
-        ctx.strokeStyle = "rgba(255,255,255,0.75)";
-        ctx.lineWidth = 2.5 * DPR;
+        ctx.strokeStyle = "rgba(255,255,255,0.82)";
+        ctx.lineWidth = 2.6 * DPR;
         ctx.beginPath();
         ctx.moveTo(-CELL * 0.36, CELL * 0.26);
         ctx.lineTo(CELL * 0.34, -CELL * 0.22);
@@ -597,7 +577,7 @@
       ctx.globalAlpha = 0.22;
       ctx.fillStyle = "#fff";
       ctx.beginPath();
-      ctx.arc(-CELL * 0.10, -CELL * 0.10, CELL * 0.12, 0, Math.PI * 2);
+      ctx.arc(-CELL * 0.1, -CELL * 0.1, CELL * 0.12, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
@@ -653,7 +633,6 @@
     // ---------------- INPUT ----------------
     function toCanvasXY(ev) {
       const rect = canvas.getBoundingClientRect();
-      // coords CSS -> coords canvas (DPR)
       const x = ((ev.clientX - rect.left) / rect.width) * canvas.width;
       const y = ((ev.clientY - rect.top) / rect.height) * canvas.height;
       return { x, y };
@@ -690,7 +669,7 @@
     function applyLevel(i, freshScore = true) {
       hideWin();
       hideLose();
-      closeLevels();
+      if (HAS_LEVELS_UI) ui.levelsModal.classList.add("hidden");
 
       levelIndex = clamp(i, 0, LEVELS.length - 1);
       if (levelIndex + 1 > unlockedMax) levelIndex = unlockedMax - 1;
@@ -718,35 +697,54 @@
       hideLose();
       if (levelIndex < LEVELS.length - 1) applyLevel(levelIndex + 1, true);
       else {
-        ui.winText.textContent = "Dernier niveau atteint ✅";
-        ui.winModal.classList.remove("hidden");
+        if (HAS_WIN_UI) {
+          ui.winText.textContent = "Dernier niveau atteint ✅";
+          ui.winModal.classList.remove("hidden");
+        } else {
+          updateHUD("✅ Dernier niveau atteint");
+        }
       }
     }
 
-    // ---------------- BUTTONS ----------------
+    // ---------------- BUTTONS (branchés seulement si présents) ----------------
     ui.newGame.addEventListener("click", () => applyLevel(levelIndex, true));
-    ui.levelsBtn.addEventListener("click", openLevels);
 
-    ui.winRestart.addEventListener("click", () => {
-      hideWin();
-      applyLevel(levelIndex, true);
-    });
-    ui.winNext.addEventListener("click", () => nextLevel());
-    ui.winMenu.addEventListener("click", () => {
-      hideWin();
-      openLevels();
-    });
+    if (HAS_LEVELS_UI) {
+      ui.levelsBtn.addEventListener("click", () => {
+        renderMap();
+        ui.levelsModal.classList.remove("hidden");
+      });
+      ui.levelsClose.addEventListener("click", () => ui.levelsModal.classList.add("hidden"));
+    }
 
-    ui.loseRestart.addEventListener("click", () => {
-      hideLose();
-      applyLevel(levelIndex, true);
-    });
-    ui.loseMenu.addEventListener("click", () => {
-      hideLose();
-      openLevels();
-    });
+    if (HAS_WIN_UI) {
+      ui.winRestart.addEventListener("click", () => {
+        hideWin();
+        applyLevel(levelIndex, true);
+      });
+      ui.winNext.addEventListener("click", () => nextLevel());
+      if (ui.winMenu && HAS_LEVELS_UI) {
+        ui.winMenu.addEventListener("click", () => {
+          hideWin();
+          renderMap();
+          ui.levelsModal.classList.remove("hidden");
+        });
+      }
+    }
 
-    ui.levelsClose.addEventListener("click", closeLevels);
+    if (HAS_LOSE_UI) {
+      ui.loseRestart.addEventListener("click", () => {
+        hideLose();
+        applyLevel(levelIndex, true);
+      });
+      if (ui.loseMenu && HAS_LEVELS_UI) {
+        ui.loseMenu.addEventListener("click", () => {
+          hideLose();
+          renderMap();
+          ui.levelsModal.classList.remove("hidden");
+        });
+      }
+    }
 
     // ---------------- LOOP ----------------
     function tick() {
