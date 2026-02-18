@@ -3,94 +3,108 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport"
-        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+        content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
   <title>Match-3</title>
-  <link rel="stylesheet" href="./style.css?v=2200" />
+  <link rel="stylesheet" href="style.css?v=1401" />
 </head>
 
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="brandTitle">Match-3</div>
-      <div class="brandSub">Niv <b id="level">1</b></div>
-    </div>
+  <main id="app" class="app">
 
-    <div class="hudCards">
-      <div class="card">
-        <div class="label">⭐ Best</div>
-        <div class="value" id="best">0</div>
-      </div>
-      <div class="card">
-        <div class="label">🎯 Score</div>
-        <div class="value" id="score">0</div>
-      </div>
-      <div class="card">
-        <div class="label">🪄 Coups</div>
-        <div class="value" id="moves">0</div>
-      </div>
-    </div>
+    <!-- Crash screen -->
+    <pre id="bootError" class="hidden bootError"></pre>
 
-    <div class="actions">
-      <button id="newGame" type="button">Recommencer</button>
-      <button id="openLevels" type="button">Niveaux</button>
-    </div>
-  </header>
-
-  <main class="layout">
-    <section class="boardWrap">
-      <canvas id="game" width="640" height="640" aria-label="Jeu match-3"></canvas>
-    </section>
-
-    <section class="dock" aria-label="Objectifs du niveau">
-      <div class="dockHeader">
-        <div class="dockTitle">Objectifs</div>
+    <!-- Top HUD -->
+    <header class="hud">
+      <div class="topline">
+        <div class="brand">
+          <div class="title">Match-3</div>
+          <!-- IMPORTANT : ici on ne met PAS "Niv" dans le HTML.
+               Le JS met déjà "Niv X" dans #level -->
+          <div id="level" class="subtitle">Niv 1</div>
+        </div>
         <div id="status" class="status"></div>
       </div>
-      <ul id="objectives" class="objectives"></ul>
+
+      <div class="stats">
+        <div class="statCard">
+          <div class="label">⭐ Best</div>
+          <div class="value" id="best">0</div>
+        </div>
+        <div class="statCard">
+          <div class="label">🎯 Score</div>
+          <div class="value" id="score">0</div>
+        </div>
+        <div class="statCard">
+          <div class="label">🪄 Coups</div>
+          <div class="value" id="moves">0</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="newGame" type="button">Recommencer</button>
+        <button id="levelsBtn" type="button">Niveaux</button>
+      </div>
+    </header>
+
+    <!-- Board -->
+    <section class="gameArea">
+      <canvas id="game" aria-label="Plateau de jeu"></canvas>
     </section>
+
+    <!-- Objectives -->
+    <section class="objectivesPanel" aria-label="Objectifs">
+      <h2>Objectifs</h2>
+      <ul id="objectives"></ul>
+    </section>
+
+    <!-- Win modal -->
+    <div id="winModal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modalCard">
+        <div class="modalTitle">Victoire 🎉</div>
+        <pre id="winText" class="modalText"></pre>
+        <div class="actions">
+          <button id="winRestart" type="button">Rejouer</button>
+          <button id="winNext" type="button">Niveau suivant</button>
+          <button id="winMenu" type="button">Niveaux</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lose modal -->
+    <div id="loseModal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modalCard">
+        <div class="modalTitle">Game Over 💀</div>
+        <pre id="loseText" class="modalText"></pre>
+        <div class="actions">
+          <button id="loseRestart" type="button">Recommencer</button>
+          <button id="loseMenu" type="button">Niveaux</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Levels modal -->
+    <div id="levelsModal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modalCard modalCardTall">
+        <div class="modalHeader">
+          <div class="modalTitle">Carte des niveaux</div>
+          <button id="levelsClose" type="button">Fermer</button>
+        </div>
+        <div id="mapWrap" class="mapWrap"></div>
+      </div>
+    </div>
+
   </main>
 
-  <!-- Modal victoire -->
-  <div id="winModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Victoire">
-    <div class="modalCard">
-      <div class="modalTitle">🎉 Niveau réussi !</div>
-      <div class="modalText" id="winText">Objectifs remplis ✅</div>
-      <div class="modalButtons">
-        <button id="winRestart" type="button">Recommencer</button>
-        <button id="winNext" type="button">Niveau suivant</button>
-        <button id="winLevels" type="button">Menu niveaux</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal game over -->
-  <div id="loseModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Game Over">
-    <div class="modalCard">
-      <div class="modalTitle">💀 Game Over</div>
-      <div class="modalText" id="loseText">Objectifs non atteints…</div>
-      <ul class="modalList" id="loseDetails"></ul>
-      <div class="modalButtons">
-        <button id="loseRestart" type="button">Réessayer</button>
-        <button id="loseLevels" type="button">Menu niveaux</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal menu niveaux -->
-  <div id="levelsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Menu niveaux">
-    <div class="modalCard">
-      <div class="modalTitle">🗺️ Choisir un niveau</div>
-      <div class="modalText">Sélectionne un niveau à lancer.</div>
-      <div id="levelsGrid" class="levelsGrid"></div>
-      <div class="modalButtons">
-        <button id="levelsClose" type="button">Fermer</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Overlay d’erreur (si crash JS) -->
-  <div id="bootError" class="bootError hidden"></div>
-
-  <script src="./game.js?v=2200"></script>
+  <script>
+    window.__BUILD__ = "1401";
+    const s = document.createElement("script");
+    s.src = "game.js?v=" + encodeURIComponent(window.__BUILD__);
+    s.defer = true;
+    document.head.appendChild(s);
+  </script>
 </body>
 </html>
