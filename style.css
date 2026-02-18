@@ -1,37 +1,26 @@
-/* =========================
-   Match-3 — style.css (layout iOS safe)
-   Objectif : pas de scroll page, pas de zoom, mais objectifs toujours visibles
-   ========================= */
-
 :root{
   --bg0:#070b12;
   --bg1:#0a101a;
-  --panel:#0c1422;
-  --panel2:#0a1220;
-  --stroke:rgba(255,255,255,.08);
-  --stroke2:rgba(255,255,255,.12);
-  --text:#e8eefc;
-  --muted:rgba(232,238,252,.70);
-  --shadow:0 16px 40px rgba(0,0,0,.45);
+  --panel: rgba(255,255,255,.05);
+  --panel2: rgba(255,255,255,.03);
+  --stroke: rgba(255,255,255,.10);
+  --text:#eaf0ff;
+  --muted: rgba(234,240,255,.72);
+  --shadow: 0 18px 44px rgba(0,0,0,.45);
 
-  --r:18px;
-  --r2:22px;
+  --r: 22px;
+  --pad: 16px;
+  --gap: 12px;
 
-  --gap:14px;
-  --pad:16px;
-
-  /* hauteur max du panneau objectifs (en bas) */
-  --objMax: 22dvh;
+  /* Objectifs : un poil moins haut pour remonter le tout */
+  --objMax: 18dvh;
 }
 
-/* iOS: hauteur fiable */
 html{
   height: 100%;
   height: -webkit-fill-available;
-  background: radial-gradient(1200px 700px at 30% 0%, #0b1422 0%, var(--bg0) 50%, #060910 100%);
+  background: radial-gradient(1200px 700px at 30% 0%, #0b1422 0%, var(--bg0) 55%, #060910 100%);
   color: var(--text);
-
-  /* anti-zoom/scroll */
   overflow: hidden;
   -webkit-text-size-adjust: 100%;
   touch-action: manipulation;
@@ -39,138 +28,168 @@ html{
 
 body{
   margin:0;
-  height: 100%;
-  height: -webkit-fill-available;
-  background: transparent;
-  overflow: hidden; /* pas de scroll global */
+  height:100%;
+  height:-webkit-fill-available;
+  overflow:hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
 }
 
-/* Conteneur principal (si tu as .app ou .container, on couvre large) */
-#app, .app, .container, main{
-  height: 100dvh;                 /* clé iOS */
-  height: -webkit-fill-available; /* fallback */
-  overflow: hidden;
-  display: flex;
+.hidden{ display:none !important; }
+
+#app.app{
+  height: 100dvh;
+  height: -webkit-fill-available;
+  overflow:hidden;
+
+  display:flex;
   flex-direction: column;
   gap: var(--gap);
   padding: var(--pad);
   box-sizing: border-box;
 }
 
-/* Header / HUD : on évite qu’il “mange” le bas */
-header, .header, .hud{
-  flex: 0 0 auto;
+/* BootError visible */
+.bootError{
+  white-space: pre-wrap;
+  margin:0;
+  padding:18px;
 }
 
-/* Cartes score */
-.stats, .scoreRow{
+/* HUD */
+.hud{ flex: 0 0 auto; }
+
+.topline{
   display:flex;
-  gap:12px;
+  align-items:flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.brand .title{
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: .2px;
+  line-height: 1.05;
+}
+.brand .subtitle{
+  margin-top: 4px;
+  opacity: .8;
+  font-weight: 800;
+}
+
+.status{
+  opacity: .65;
+  font-size: 13px;
+  text-align:right;
+  max-width: 42vw;
+}
+
+/* Stats cards */
+.stats{
+  display:flex;
+  gap: 12px;
+  margin-top: 12px;
   flex-wrap: wrap;
-  align-items: center;
 }
 
-.statCard, .stat{
-  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+.statCard{
+  background: linear-gradient(180deg, var(--panel), var(--panel2));
   border: 1px solid var(--stroke);
-  border-radius: var(--r2);
+  border-radius: var(--r);
   padding: 10px 14px;
-  min-width: 108px;
-  box-shadow: 0 10px 22px rgba(0,0,0,.22);
+  min-width: 110px;
+  box-shadow: 0 12px 24px rgba(0,0,0,.22);
 }
 
-.statCard .label, .stat .label{
+.statCard .label{
   color: var(--muted);
   font-size: 13px;
   letter-spacing: .2px;
 }
 
-.statCard .value, .stat .value{
-  font-size: 28px;
-  font-weight: 800;
+.statCard .value{
   margin-top: 2px;
+  font-size: 28px;
+  font-weight: 900;
 }
 
-/* Boutons */
-.actions, .buttons, .btnRow{
+/* Buttons */
+.actions{
   display:flex;
-  gap:12px;
+  gap: 12px;
+  margin-top: 10px;
   flex-wrap: wrap;
 }
 
 button{
-  appearance: none;
-  border: 1px solid var(--stroke2);
+  appearance:none;
+  border: 1px solid rgba(255,255,255,.14);
   background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
   color: var(--text);
   border-radius: 999px;
   padding: 10px 16px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: .2px;
-  box-shadow: 0 10px 24px rgba(0,0,0,.25);
+  box-shadow: 0 12px 24px rgba(0,0,0,.20);
 }
 
 button:active{ transform: translateY(1px); }
+*{ -webkit-tap-highlight-color: transparent; }
 
-/* Zone jeu : prend TOUT l’espace restant */
-.gameArea, .boardArea, .playArea{
+/* Game area takes remaining space */
+.gameArea{
   flex: 1 1 auto;
-  min-height: 0; /* IMPORTANT pour iOS + flex */
+  min-height: 0;
   display:flex;
-  align-items: center;
-  justify-content: center;
+  align-items:center;
+  justify-content:center;
 }
 
-/* Canvas : carré, responsive, sans déborder */
+/* Canvas responsive, centered */
 #game{
-  width: min(92vw, 520px);
+  width: min(94vw, 560px);
   aspect-ratio: 1 / 1;
   height: auto;
   display:block;
 
   background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
-  border: 1px solid rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.09);
   border-radius: 28px;
   box-shadow: var(--shadow);
 }
 
-/* Panneau objectifs : TOUJOURS visible, scroll interne seulement si nécessaire */
-.objectives, .objectivesPanel, #objectivesWrap, .goalsPanel, .panelObjectives{
+/* Objectives panel (visible, not too low) */
+.objectivesPanel{
   flex: 0 0 auto;
   max-height: var(--objMax);
-  min-height: 120px;
-  overflow: auto; /* scroll interne */
+  min-height: 110px;
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 
   background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-  border: 1px solid var(--stroke);
-  border-radius: 22px;
-  padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: var(--r);
+  padding: 12px 14px;
   box-shadow: 0 14px 34px rgba(0,0,0,.35);
 }
 
-/* Texte objectifs */
-.objectives h2, .objectivesPanel h2, .goalsPanel h2{
+.objectivesPanel h2{
   margin:0 0 10px 0;
   font-size: 22px;
   font-weight: 900;
 }
 
-#objectives, .objectives ul{
-  margin: 0;
+#objectives{
+  margin:0;
   padding-left: 20px;
   line-height: 1.5;
   font-size: 18px;
 }
+#objectives li{ margin: 8px 0; }
 
-#objectives li{
-  margin: 8px 0;
-}
-
-/* Modals (si présents) */
-.modal, .overlay{
+/* Modals */
+.modal{
   position: fixed;
   inset: 0;
   display:flex;
@@ -182,7 +201,46 @@ button:active{ transform: translateY(1px); }
   z-index: 999;
 }
 
-.hidden{ display:none !important; }
+.modalCard{
+  width: min(92vw, 560px);
+  background: rgba(10,16,26,.92);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 22px;
+  padding: 16px;
+}
 
-/* Micro: éviter le petit “saut” iOS lors de focus/scroll */
-*{ -webkit-tap-highlight-color: transparent; }
+.modalCardTall{
+  height: min(82dvh, 740px);
+  display:flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modalHeader{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modalTitle{
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.modalText{
+  white-space: pre-wrap;
+  margin: 10px 0 14px 0;
+  opacity: .92;
+}
+
+/* Map container */
+.mapWrap{
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.03);
+}
